@@ -1,12 +1,12 @@
 #!/bin/sh
 set -e
 
-RELEASE_REPOSITORY="open-telemetry/opentelemetry-dotnet-instrumentation"
-RELEASE_WORKFLOW="$RELEASE_REPOSITORY/.github/workflows/release.yml"
+RELEASE_REPOSITORY="GuanceCloud/beacon-dotnet"
+RELEASE_WORKFLOW="$RELEASE_REPOSITORY/.github/workflows/beacon-release.yml"
 
 assert_release_version() {
-  if ! printf '%s\n' "$1" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
-    echo "Invalid release version '$1'. Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-PRERELEASE (for example, v1.17.0-beta.1)." >&2
+  if ! printf '%s\n' "$1" | grep -Eq '^beacon-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+    echo "Invalid release version '$1'. Expected beacon-vMAJOR.MINOR.PATCH or beacon-vMAJOR.MINOR.PATCH-PRERELEASE (for example, beacon-v0.2.0-beta.1)." >&2
     return 1
   fi
 }
@@ -92,6 +92,16 @@ case "$ARCHITECTURE" in
     ;;
 esac
 
+if [ "$OS_TYPE" = "macos" ] && [ "$ARCHITECTURE" != "arm64" ]; then
+  echo "Beacon .NET currently supports macOS on arm64 only." >&2
+  exit 1
+fi
+
+if [ "$OS_TYPE" = "windows" ] && [ "$ARCHITECTURE" != "x64" ]; then
+  echo "Beacon .NET currently supports the Windows archive on x64 hosts only." >&2
+  exit 1
+fi
+
 if command -v curl > /dev/null 2>&1; then
   DOWNLOADER="curl -sSfLo"
 elif command -v wget > /dev/null 2>&1; then
@@ -102,7 +112,7 @@ else
 fi
 
 test -z "$OTEL_DOTNET_AUTO_HOME" && OTEL_DOTNET_AUTO_HOME="$HOME/.otel-dotnet-auto"
-test -z "$VERSION" && VERSION="v{{VERSION}}"
+test -z "$VERSION" && VERSION="beacon-v{{VERSION}}"
 
 assert_release_version "$VERSION"
 
@@ -124,11 +134,12 @@ if [ -z "${DOWNLOAD_DIR:-}" ]; then
 fi
 
 RELEASES_URL="https://github.com/$RELEASE_REPOSITORY/releases"
-ARCHIVE="opentelemetry-dotnet-instrumentation-$OS_TYPE.zip"
+PRODUCT_VERSION="${VERSION#beacon-v}"
+ARCHIVE="beacon-dotnet-auto-$PRODUCT_VERSION-$OS_TYPE.zip"
 
 # In case of Linux, use architecture in the download path
 if echo "$OS_TYPE" | grep -q "linux"; then
-  ARCHIVE="opentelemetry-dotnet-instrumentation-$OS_TYPE-$ARCHITECTURE.zip"
+  ARCHIVE="beacon-dotnet-auto-$PRODUCT_VERSION-$OS_TYPE-$ARCHITECTURE.zip"
 fi
 
 LOCAL_PATH="${LOCAL_PATH:=$DOWNLOAD_DIR/$ARCHIVE}"

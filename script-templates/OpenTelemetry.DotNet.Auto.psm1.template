@@ -17,15 +17,15 @@
 #Requires -RunAsAdministrator
 
 $ServiceLocatorVariable = "OTEL_DOTNET_AUTO_INSTALL_DIR"
-$ReleaseRepository = "open-telemetry/opentelemetry-dotnet-instrumentation"
-$ReleaseWorkflow = "$ReleaseRepository/.github/workflows/release.yml"
+$ReleaseRepository = "GuanceCloud/beacon-dotnet"
+$ReleaseWorkflow = "$ReleaseRepository/.github/workflows/beacon-release.yml"
 
 function Get-Current-InstallDir() {
     return [System.Environment]::GetEnvironmentVariable($ServiceLocatorVariable, [System.EnvironmentVariableTarget]::Machine)
 }
 
 function Get-Newest-InstallVersion() { 
-    $query = "https://api.github.com/repos/open-telemetry/opentelemetry-dotnet-instrumentation/releases/latest"
+    $query = "https://api.github.com/repos/$ReleaseRepository/releases/latest"
 
     $response = Invoke-WebRequest -Uri $query -UseBasicParsing
     $responseJson = $response.Content | ConvertFrom-Json
@@ -62,7 +62,7 @@ function New-Release-Download-Directory() {
 }
 
 function Assert-Release-Version([string]$Version) {
-    $semanticVersionPattern = '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
+    $semanticVersionPattern = '^beacon-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
     if ($Version -notmatch $semanticVersionPattern) {
         throw "Invalid release version '$Version'."
     }
@@ -116,8 +116,9 @@ function Reset-IIS() {
 }
 
 function Download-OpenTelemetry([string]$Version, [string]$Path) {
-    $archive = "opentelemetry-dotnet-instrumentation-windows.zip"
-    $dlUrl = "https://github.com/open-telemetry/opentelemetry-dotnet-instrumentation/releases/download/$Version/$archive"
+    $productVersion = $Version -replace '^beacon-v', ''
+    $archive = "beacon-dotnet-auto-$productVersion-windows.zip"
+    $dlUrl = "https://github.com/$ReleaseRepository/releases/download/$Version/$archive"
     $dlPath = Join-Path $Path $archive
 
     Invoke-WebRequest -Uri $dlUrl -OutFile $dlPath -UseBasicParsing
@@ -127,7 +128,7 @@ function Download-OpenTelemetry([string]$Version, [string]$Path) {
 
 function Download-OpenTelemetry-Install-Module([string]$Version, [string]$Path) {
     $module = "OpenTelemetry.DotNet.Auto.psm1"
-    $dlUrl = "https://github.com/open-telemetry/opentelemetry-dotnet-instrumentation/releases/download/$Version/$module"
+    $dlUrl = "https://github.com/$ReleaseRepository/releases/download/$Version/$module"
     $dlPath = Join-Path $Path $module
 
     Invoke-WebRequest -Uri $dlUrl -OutFile $dlPath -UseBasicParsing
@@ -279,7 +280,8 @@ function Filter-Env-List([string[]]$EnvValues, [string[]]$Filters) {
 function Get-OpenTelemetry-Archive([string]$Version, [string]$LocalPath, [string]$DownloadDirectory) {
     if ($LocalPath) {
         if (Test-Path -LiteralPath $LocalPath -PathType Leaf) {
-            $archivePath = Join-Path $DownloadDirectory "opentelemetry-dotnet-instrumentation-windows.zip"
+            $productVersion = $Version -replace '^beacon-v', ''
+            $archivePath = Join-Path $DownloadDirectory "beacon-dotnet-auto-$productVersion-windows.zip"
             Copy-Item -LiteralPath $LocalPath -Destination $archivePath -ErrorAction Stop
 
             return $archivePath
@@ -299,20 +301,10 @@ function Test-AssemblyNotForGAC([string] $Name) {
     return $false 
 }
 
-function Get-AssemblyDllFileVersion($AssemblyDll) {
-    $installDir = Get-OpenTelemetryInstallDirectory
-
-    if ($installDir) {
-        $mainDllPath = [IO.Path]::Combine($installDir, 'net', $AssemblyDll)
-
-        return "v" + ([System.Diagnostics.FileVersionInfo]::GetVersionInfo($mainDllPath).ProductVersion).split('+', 2)[0]
-    }
-}
-
 function Is-Greater-Version($v1, $v2) {
     # Helper convert version main part to version object
     function ToVersion($version) {
-        return ($version -replace '^v' -replace '-.+$') -as [version]
+        return ($version -replace '^beacon-v' -replace '-.+$') -as [version]
     }
 
     # Helper convert version pre part to version object
@@ -321,7 +313,7 @@ function Is-Greater-Version($v1, $v2) {
         $rank = "alpha", "beta", "rc", $null
         $ranked = $null
 
-        if ($version -match "^v\d+\.\d+\.\d+?(\-(?<pre>[\w\.]+))") {
+        if ($version -match "^beacon-v\d+\.\d+\.\d+?(\-(?<pre>[\w\.]+))") {
             $token = $matches['pre'].split('.')[0]
             $ranked = $matches['pre'] -replace $token, $rank.IndexOf($token)
         }
@@ -428,7 +420,7 @@ function Install-OpenTelemetryCore() {
         [switch]$SkipReleaseVerification
     )
 
-    $version = "v{{VERSION}}"
+    $version = "beacon-v{{VERSION}}"
     $installDir = Get-CLIInstallDir-From-InstallDir $InstallDir
     $downloadDir = $null
     $archivePath = $null
@@ -770,7 +762,21 @@ function Get-OpenTelemetryInstallDirectory() {
     Gets OpenTelemetry .NET Automatic Instrumentation install version. 
 #>
 function Get-OpenTelemetryInstallVersion() {
-    return Get-AssemblyDllFileVersion 'OpenTelemetry.AutoInstrumentation.dll'
+    $installDir = Get-OpenTelemetryInstallDirectory
+    if (-not $installDir) {
+        return
+    }
+
+    $metadataPath = Join-Path $installDir "BEACON-METADATA.json"
+    if (-not (Test-Path -LiteralPath $metadataPath -PathType Leaf)) {
+        throw "Beacon installation metadata is missing from '$installDir'. Reinstall Beacon .NET before updating."
+    }
+
+    $metadata = Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
+    $version = "beacon-v$($metadata.version)"
+    Assert-Release-Version $version
+
+    return $version
 }
 
 <#

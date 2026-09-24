@@ -38,10 +38,6 @@ command -v sha256sum >/dev/null 2>&1 || fail "sha256sum is required"
 
 bash "${repository_root}/beacon/scripts/check-version.sh" >/dev/null
 version="$(sed -n 's/^beacon\.version=//p' "${repository_root}/beacon/version.properties")"
-upstream_repository="$(sed -n 's/.*"repository": "\([^"]*\)".*/\1/p' "${repository_root}/beacon/upstream.lock.json")"
-upstream_tag="$(sed -n 's/.*"releaseTag": "\([^"]*\)".*/\1/p' "${repository_root}/beacon/upstream.lock.json")"
-upstream_commit="$(sed -n 's/.*"releaseCommit": "\([0-9a-f]*\)".*/\1/p' "${repository_root}/beacon/upstream.lock.json")"
-source_commit="$(git -C "${repository_root}" rev-parse HEAD)"
 
 mkdir -p "${output}"
 output="$(cd "${output}" && pwd)"
@@ -56,19 +52,9 @@ cleanup() {
 trap cleanup EXIT
 
 cp -a "${input}/." "${staging}/"
-cat > "${staging}/BEACON-METADATA.json" <<EOF
-{
-  "product": "Beacon .NET",
-  "version": "${version}",
-  "target": "${target}",
-  "sourceCommit": "${source_commit}",
-  "upstream": {
-    "repository": "${upstream_repository}",
-    "releaseTag": "${upstream_tag}",
-    "releaseCommit": "${upstream_commit}"
-  }
-}
-EOF
+bash "${repository_root}/beacon/scripts/write-metadata.sh" \
+  --directory "${staging}" \
+  --target "${target}" >/dev/null
 
 (cd "${staging}" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 zip -q -X "${archive_path}")
 (cd "${output}" && sha256sum "${archive_name}" > "${archive_name}.sha256")

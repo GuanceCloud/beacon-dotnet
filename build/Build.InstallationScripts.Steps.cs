@@ -10,6 +10,16 @@ partial class Build
         .After(CreateRequiredDirectories)
         .Executes(() =>
         {
+            var versionFile = RootDirectory / "beacon" / "version.properties";
+            var versionLines = File.ReadAllLines(versionFile)
+                .Where(line => line.StartsWith("beacon.version=", StringComparison.Ordinal))
+                .ToArray();
+            if (versionLines.Length != 1)
+            {
+                throw new InvalidOperationException($"Expected exactly one beacon.version in {versionFile}.");
+            }
+
+            var beaconVersion = versionLines[0]["beacon.version=".Length..];
             var scriptTemplates = RootDirectory / "script-templates";
             var templateFiles = scriptTemplates.GetFiles();
             foreach (var templateFile in templateFiles)
@@ -17,7 +27,7 @@ partial class Build
                 var scriptFile = InstallationScriptsDirectory / templateFile.Name.Replace(".template", "");
                 templateFile.Copy(scriptFile, ExistsPolicy.FileOverwrite);
                 scriptFile.UpdateText(x =>
-                    x.Replace("{{VERSION}}", VersionHelper.GetVersion()));
+                    x.Replace("{{VERSION}}", beaconVersion));
             }
         });
 }

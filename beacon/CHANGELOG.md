@@ -5,6 +5,13 @@
 
 ## Unreleased
 
+## 0.1.1 - 2026-09-24
+
+- 增加 Linux glibc/musl x64 与 ARM64、Windows、macOS 和 NuGet 发布归档。
+- 增加 Shell 与 PowerShell 安装脚本，以及发布后的跨平台安装和运行验证。
+- 增加统一 SHA-256 清单、SPDX SBOM 和 GitHub 构建证明。
+- 所有平台归档统一包含 Beacon 版本、目标平台和固定上游来源元数据。
+
 ## 0.1.0 - 2026-09-24
 
 - 基于 OpenTelemetry .NET Automatic Instrumentation `v1.17.0` 建立完整源码下游工程。

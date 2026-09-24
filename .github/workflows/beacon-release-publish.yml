@@ -1,0 +1,208 @@
+name: Beacon .NET Published Release Validation
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  powershell-installer:
+    name: PowerShell installer on ${{ matrix.machine }}
+    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.machine }}
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: ./.github/actions/setup-dotnet
+
+      - name: Install and run with the published PowerShell module
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          New-Item -ItemType Directory -Path testapp | Out-Null
+          Set-Location testapp
+          Set-Content Directory.Build.props '<Project />'
+          dotnet new console --framework net8.0
+          dotnet publish --framework net8.0 --configuration Release
+
+          $modulePath = Join-Path $env:RUNNER_TEMP "OpenTelemetry.DotNet.Auto.psm1"
+          $moduleUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG/OpenTelemetry.DotNet.Auto.psm1"
+          Invoke-WebRequest -Uri $moduleUrl -OutFile $modulePath
+          gh release verify-asset $env:RELEASE_TAG $modulePath --repo $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw "Release asset verification failed." }
+          gh attestation verify $modulePath `
+            --repo $env:GITHUB_REPOSITORY `
+            --signer-workflow "$env:GITHUB_REPOSITORY/.github/workflows/beacon-release.yml" `
+            --source-ref "refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { throw "Artifact attestation verification failed." }
+
+          Import-Module $modulePath
+          $installDirectory = Join-Path $env:RUNNER_TEMP "beacon-dotnet-auto"
+          Install-OpenTelemetryCore -InstallDir $installDirectory -RegisterAssembliesInGAC $false -ErrorAction Stop
+          Register-OpenTelemetryForCurrentSession -OTelServiceName "beacon-release-validation"
+          ./bin/Release/net8.0/publish/testapp.exe
+          if (-not $?) { throw "Instrumented application failed with exit code $LASTEXITCODE." }
+          if (-not (Test-Path (Join-Path $installDirectory "BEACON-METADATA.json"))) { throw "Beacon metadata is missing." }
+          Unregister-OpenTelemetryForCurrentSession
+          Uninstall-OpenTelemetryCore
+
+  unix-installer:
+    name: Shell installer on ${{ matrix.machine }}
+    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - machine: ubuntu-22.04
+          - machine: ubuntu-22.04-arm
+          - machine: macos-14
+    runs-on: ${{ matrix.machine }}
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: ./.github/actions/setup-dotnet
+
+      - name: Install macOS coreutils
+        if: runner.os == 'macOS'
+        run: brew install coreutils
+
+      - name: Install and run with the published shell installer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir testapp
+          cd testapp
+          printf '%s\n' '<Project />' > Directory.Build.props
+          dotnet new console --framework net8.0
+          dotnet publish --framework net8.0 --configuration Release
+
+          installer="${RUNNER_TEMP}/otel-dotnet-auto-install.sh"
+          curl -sSfL \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/otel-dotnet-auto-install.sh" \
+            -o "${installer}"
+          gh release verify-asset "${RELEASE_TAG}" "${installer}" --repo "${GITHUB_REPOSITORY}"
+          gh attestation verify "${installer}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/beacon-release.yml" \
+            --source-ref "refs/tags/${RELEASE_TAG}"
+
+          install_directory="${RUNNER_TEMP}/beacon-dotnet-auto"
+          VERSION="${RELEASE_TAG}" OTEL_DOTNET_AUTO_HOME="${install_directory}" sh "${installer}"
+          test -f "${install_directory}/BEACON-METADATA.json"
+          OTEL_DOTNET_AUTO_HOME="${install_directory}" \
+            OTEL_SERVICE_NAME="beacon-release-validation" \
+            OTEL_TRACES_EXPORTER=none \
+            OTEL_METRICS_EXPORTER=none \
+            OTEL_LOGS_EXPORTER=none \
+            "${install_directory}/instrument.sh" ./bin/Release/net8.0/publish/testapp
+
+  musl-installer:
+    name: Shell installer on ${{ matrix.target }}
+    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - machine: ubuntu-24.04
+            target: linux-musl-x64
+          - machine: ubuntu-24.04-arm
+            target: linux-musl-arm64
+    runs-on: ${{ matrix.machine }}
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Verify published installer and archive
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#beacon-v}"
+          archive="beacon-dotnet-auto-${version}-${TARGET}.zip"
+          gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${archive}" \
+            --pattern otel-dotnet-auto-install.sh \
+            --dir "${RUNNER_TEMP}/beacon-release"
+          for file in "${RUNNER_TEMP}/beacon-release/${archive}" "${RUNNER_TEMP}/beacon-release/otel-dotnet-auto-install.sh"; do
+            gh release verify-asset "${RELEASE_TAG}" "${file}" --repo "${GITHUB_REPOSITORY}"
+            gh attestation verify "${file}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/beacon-release.yml" \
+              --source-ref "refs/tags/${RELEASE_TAG}"
+          done
+
+      - name: Install and run inside Alpine
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#beacon-v}"
+          archive="beacon-dotnet-auto-${version}-${TARGET}.zip"
+          docker build -t beacon-release-alpine -f docker/alpine.dockerfile .
+          docker run --rm \
+            -e "RELEASE_TAG=${RELEASE_TAG}" \
+            -e "ARCHIVE=${archive}" \
+            -v "${RUNNER_TEMP}/beacon-release:/release:ro" \
+            beacon-release-alpine /bin/sh -c '
+              set -e
+              apk add --no-cache unzip
+              mkdir /tmp/testapp
+              cd /tmp/testapp
+              printf "%s\n" "<Project />" > Directory.Build.props
+              dotnet new console --framework net8.0
+              dotnet publish --framework net8.0 --configuration Release
+              VERSION="$RELEASE_TAG" \
+                LOCAL_PATH="/release/$ARCHIVE" \
+                OTEL_DOTNET_AUTO_HOME=/tmp/beacon-dotnet-auto \
+                SKIP_RELEASE_VERIFICATION=true \
+                sh /release/otel-dotnet-auto-install.sh
+              test -f /tmp/beacon-dotnet-auto/BEACON-METADATA.json
+              OTEL_DOTNET_AUTO_HOME=/tmp/beacon-dotnet-auto \
+                OTEL_SERVICE_NAME=beacon-release-validation \
+                OTEL_TRACES_EXPORTER=none \
+                OTEL_METRICS_EXPORTER=none \
+                OTEL_LOGS_EXPORTER=none \
+                /tmp/beacon-dotnet-auto/instrument.sh ./bin/Release/net8.0/publish/testapp
+            '

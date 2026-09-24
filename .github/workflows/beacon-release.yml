@@ -1,0 +1,204 @@
+name: Beacon .NET Release
+
+on:
+  push:
+    tags: [beacon-v*]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  NUGET_PACKAGES: ${{ github.workspace }}/packages
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+jobs:
+  build-ubuntu1604-native:
+    uses: ./.github/workflows/build-ubuntu1604-native-container.yml
+
+  build-windows:
+    uses: ./.github/workflows/build-windows.yml
+
+  build:
+    needs: [build-windows, build-ubuntu1604-native]
+    uses: ./.github/workflows/build.yml
+
+  build-nuget-packages:
+    needs: [build-windows, build]
+    uses: ./.github/workflows/build-nuget-packages.yml
+
+  create-release:
+    name: Create verified draft release
+    runs-on: ubuntu-24.04
+    needs: [build-windows, build, build-nuget-packages]
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+      artifact-metadata: write
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check Beacon release metadata
+        env:
+          BEACON_RELEASE_TAG: ${{ github.ref_name }}
+        run: bash beacon/scripts/check-version.sh
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: .
+
+      - name: Create Beacon archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^beacon\.version=//p' beacon/version.properties)"
+          sbom_source="${RUNNER_TEMP}/beacon-sbom-source"
+          mkdir -p "${sbom_source}"
+
+          packages=(
+            "alpine-x64 linux-musl-x64 linux-musl-x64"
+            "alpine-arm64 linux-musl-arm64 linux-musl-arm64"
+            "ubuntu-22.04 linux-glibc-x64 linux-glibc-x64"
+            "ubuntu-22.04-arm linux-glibc-arm64 linux-glibc-arm64"
+            "windows-2022 windows-x64-x86 windows"
+            "macos-14 macos-arm64 macos"
+            "nuget-packages nuget-packages nuget-packages"
+          )
+
+          for package in "${packages[@]}"; do
+            read -r directory target suffix <<< "${package}"
+            source_directory="./bin-${directory}"
+            test -d "${source_directory}"
+            bash beacon/scripts/write-metadata.sh \
+              --directory "${source_directory}" \
+              --target "${target}" >/dev/null
+
+            archive="beacon-dotnet-auto-${version}-${suffix}.zip"
+            (
+              cd "${source_directory}"
+              find . -type f -print0 | LC_ALL=C sort -z | xargs -0 zip -q -X "../${archive}"
+            )
+            unzip -q "${archive}" -d "${sbom_source}/${suffix}"
+          done
+
+      - name: Generate SBOM from release archives
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          output-file: ./sbom.spdx.json
+          path: ${{ runner.temp }}/beacon-sbom-source
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Collect installation scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_directory="./installation-scripts-windows-2022"
+          cp "${source_directory}/otel-dotnet-auto-install.sh" .
+          cp "${source_directory}/OpenTelemetry.DotNet.Auto.psm1" .
+          sh -n ./otel-dotnet-auto-install.sh
+          # shellcheck disable=SC2016
+          pwsh -NoProfile -Command \
+            '$errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("./OpenTelemetry.DotNet.Auto.psm1", [ref]$null, [ref]$errors); if ($errors.Count -ne 0) { throw ($errors | Out-String) }'
+
+      - name: Validate release files and generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^beacon\.version=//p' beacon/version.properties)"
+          source_commit="$(git rev-parse HEAD)"
+
+          mapfile -t archives < <(find . -maxdepth 1 -type f -name "beacon-dotnet-auto-${version}-*.zip" -printf '%f\n' | LC_ALL=C sort)
+          test "${#archives[@]}" -eq 7
+          for archive in "${archives[@]}"; do
+            unzip -tq "${archive}" >/dev/null
+            unzip -p "${archive}" BEACON-METADATA.json | jq -e \
+              --arg version "${version}" \
+              --arg source_commit "${source_commit}" \
+              '.version == $version and .sourceCommit == $source_commit' >/dev/null
+          done
+
+          artifacts=(
+            "${archives[@]}"
+            "OpenTelemetry.DotNet.Auto.psm1"
+            "otel-dotnet-auto-install.sh"
+            "sbom.spdx.json"
+          )
+          sha256sum "${artifacts[@]}" > checksums.txt
+          sha256sum --check checksums.txt
+
+      - name: Attest release files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            ./beacon-dotnet-auto-*.zip
+            ./otel-dotnet-auto-install.sh
+            ./OpenTelemetry.DotNet.Auto.psm1
+            ./checksums.txt
+            ./sbom.spdx.json
+
+      - name: Attest Linux glibc x64 files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./bin-ubuntu-22.04/**/*
+
+      - name: Attest Linux glibc ARM64 files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./bin-ubuntu-22.04-arm/**/*
+
+      - name: Attest Linux musl x64 files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./bin-alpine-x64/**/*
+
+      - name: Attest Linux musl ARM64 files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./bin-alpine-arm64/**/*
+
+      - name: Attest Windows files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./bin-windows-2022/**/*
+
+      - name: Attest macOS files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./bin-macos-14/**/*
+
+      - name: Attest NuGet files
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./bin-nuget-packages/**/*
+
+      - name: Create draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^beacon\.version=//p' beacon/version.properties)"
+          notes="beacon/release-notes/${version}.md"
+          test -f "${notes}"
+          gh release create "${GITHUB_REF_NAME}" \
+            ./beacon-dotnet-auto-*.zip \
+            ./otel-dotnet-auto-install.sh \
+            ./OpenTelemetry.DotNet.Auto.psm1 \
+            ./checksums.txt \
+            ./sbom.spdx.json \
+            --verify-tag \
+            --draft \
+            --target "${GITHUB_SHA}" \
+            --title "Beacon .NET ${version}" \
+            --notes-file "${notes}"
