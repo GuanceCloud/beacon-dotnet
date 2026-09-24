@@ -75,14 +75,7 @@ function Assert-OpenTelemetry-Release-Asset([string]$GitHubCLIPath, [string]$Ver
 
     $assetName = Split-Path -Leaf $Path
 
-    # Bind the downloaded file to the exact immutable GitHub release.
-    & $GitHubCLIPath release verify-asset $Version $Path --repo $ReleaseRepository
-    $releaseVerificationExitCode = $LASTEXITCODE
-    if ($releaseVerificationExitCode -ne 0) {
-        throw "GitHub release verification failed for '$assetName'."
-    }
-
-    # Verify that the expected workflow produced the file from the release tag.
+    # Verify that the expected workflow produced this exact file from the release tag.
     & $GitHubCLIPath attestation verify $Path `
         --repo $ReleaseRepository `
         --signer-workflow $ReleaseWorkflow `
@@ -406,7 +399,7 @@ function Register-AssembliesInGAC() {
     .PARAMETER LocalPath
     Path to a previously downloaded Windows archive.
     .PARAMETER SkipReleaseVerification
-    Skips GitHub release and artifact attestation verification. This is not recommended.
+    Skips GitHub artifact attestation verification. This is not recommended.
 #>
 function Install-OpenTelemetryCore() {
     param(
@@ -429,7 +422,7 @@ function Install-OpenTelemetryCore() {
     Assert-Release-Version $version
 
     if ($SkipReleaseVerification) {
-        Write-Warning "GitHub release and artifact attestation verification is skipped. The Windows ZIP archive will not be verified."
+        Write-Warning "GitHub artifact attestation verification is skipped. The Windows ZIP archive will not be verified."
     }
     else {
         $githubCLIPath = Get-GitHub-CLI-Path
@@ -511,7 +504,7 @@ function Uninstall-OpenTelemetryCore() {
     .PARAMETER RegisterIIS
     Registers IIS 
     .PARAMETER SkipReleaseVerification
-    Skips GitHub release and artifact attestation verification. This is not recommended.
+    Skips GitHub artifact attestation verification. This is not recommended.
 #>
 function Update-OpenTelemetryCore() {
     param(
@@ -543,7 +536,7 @@ function Update-OpenTelemetryCore() {
     $githubCLIPath = $null
 
     if ($SkipReleaseVerification) {
-        Write-Warning "GitHub release and artifact attestation verification is skipped. Downloaded PowerShell code and binaries will not be verified."
+        Write-Warning "GitHub artifact attestation verification is skipped. Downloaded PowerShell code and binaries will not be verified."
     }
     else {
         $githubCLIPath = Get-GitHub-CLI-Path

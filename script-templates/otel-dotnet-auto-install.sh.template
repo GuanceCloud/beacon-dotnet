@@ -31,13 +31,7 @@ assert_release_asset() {
     return 1
   fi
 
-  # Bind the downloaded file to the exact immutable GitHub release.
-  if ! "$verify_github_cli_path" release verify-asset "$verify_version" "$verify_asset_path" --repo "$RELEASE_REPOSITORY"; then
-    echo "GitHub release verification failed for '$verify_asset_name'." >&2
-    return 1
-  fi
-
-  # Verify that the expected workflow produced the file from the release tag.
+  # Verify that the expected workflow produced this exact file from the release tag.
   if ! "$verify_github_cli_path" attestation verify "$verify_asset_path" \
     --repo "$RELEASE_REPOSITORY" \
     --signer-workflow "$RELEASE_WORKFLOW" \
@@ -118,7 +112,7 @@ assert_release_version "$VERSION"
 
 GITHUB_CLI_PATH=""
 if [ "${SKIP_RELEASE_VERIFICATION:-false}" = "true" ]; then
-  echo "Warning: GitHub release and artifact attestation verification is skipped. The ZIP archive will not be verified." >&2
+  echo "Warning: GitHub artifact attestation verification is skipped. The ZIP archive will not be verified." >&2
 else
   GITHUB_CLI_PATH="$(get_github_cli_path)"
 fi

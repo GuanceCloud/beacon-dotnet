@@ -48,8 +48,6 @@ jobs:
           $modulePath = Join-Path $env:RUNNER_TEMP "OpenTelemetry.DotNet.Auto.psm1"
           $moduleUrl = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:RELEASE_TAG/OpenTelemetry.DotNet.Auto.psm1"
           Invoke-WebRequest -Uri $moduleUrl -OutFile $modulePath
-          gh release verify-asset $env:RELEASE_TAG $modulePath --repo $env:GITHUB_REPOSITORY
-          if ($LASTEXITCODE -ne 0) { throw "Release asset verification failed." }
           gh attestation verify $modulePath `
             --repo $env:GITHUB_REPOSITORY `
             --signer-workflow "$env:GITHUB_REPOSITORY/.github/workflows/beacon-release.yml" `
@@ -111,7 +109,6 @@ jobs:
           curl -sSfL \
             "https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/otel-dotnet-auto-install.sh" \
             -o "${installer}"
-          gh release verify-asset "${RELEASE_TAG}" "${installer}" --repo "${GITHUB_REPOSITORY}"
           gh attestation verify "${installer}" \
             --repo "${GITHUB_REPOSITORY}" \
             --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/beacon-release.yml" \
@@ -164,7 +161,6 @@ jobs:
             --pattern otel-dotnet-auto-install.sh \
             --dir "${RUNNER_TEMP}/beacon-release"
           for file in "${RUNNER_TEMP}/beacon-release/${archive}" "${RUNNER_TEMP}/beacon-release/otel-dotnet-auto-install.sh"; do
-            gh release verify-asset "${RELEASE_TAG}" "${file}" --repo "${GITHUB_REPOSITORY}"
             gh attestation verify "${file}" \
               --repo "${GITHUB_REPOSITORY}" \
               --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/beacon-release.yml" \

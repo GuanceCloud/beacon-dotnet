@@ -55,7 +55,7 @@ bash beacon/scripts/package.sh \
    校验归档后创建草稿 Release。
 5. 人工检查草稿中的文件数、名称、校验和、元数据和发布说明，再发布草稿。
 6. 发布后工作流从公开 Release 下载安装，在 Windows、macOS、Linux glibc/musl
-   的 x64 与 ARM64 运行 .NET 8 应用，并验证 GitHub Release 和构建证明。
+   的 x64 与 ARM64 运行 .NET 8 应用，并验证下载文件的 artifact attestation。
 
 所有验证成功后才可宣布版本可用。已发布标签和制品不可覆盖；失败后修复代码并
 递增版本。DataKit 接收链路仍需独立端到端验收，不能由 OTLP 导出测试推断。

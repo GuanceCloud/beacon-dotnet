@@ -8,7 +8,7 @@
 ## 当前状态
 
 - 已从官方 `v1.17.0` 固定基线建立非 Fork 下游工程并保留上游历史。
-- Beacon `0.1.1` 发布 Linux glibc/musl x64 与 ARM64、Windows、macOS 和
+- Beacon `0.1.2` 发布 Linux glibc/musl x64 与 ARM64、Windows、macOS 和
   NuGet 归档，并提供 Shell 与 PowerShell 安装脚本。
 - 构建阶段使用真实控制台和 ASP.NET Core 应用验证 OTLP Trace、Metric、Log；
   发布后再次从 GitHub Release 下载安装并运行 .NET 8 应用。

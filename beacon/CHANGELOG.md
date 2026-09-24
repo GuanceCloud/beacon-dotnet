@@ -5,6 +5,12 @@
 
 ## Unreleased
 
+## 0.1.2 - 2026-09-24
+
+- 安装脚本改为强制验证由 Beacon 发行工作流生成的 artifact attestation，不再
+  依赖需要仓库管理员单独启用的 Immutable Releases。
+- 发布后跨平台安装验证同步使用 artifact attestation 验证下载文件。
+
 ## 0.1.1 - 2026-09-24
 
 - 增加 Linux glibc/musl x64 与 ARM64、Windows、macOS 和 NuGet 发布归档。
