@@ -1,0 +1,53 @@
+name: Beacon .NET CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beacon-dotnet-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NUGET_PACKAGES: ${{ github.workspace }}/packages
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-dotnet
+      - name: Check Beacon metadata
+        run: bash beacon/scripts/check-version.sh
+      - name: Test Beacon packaging
+        run: bash beacon/scripts/package.test.sh
+      - name: Build automatic instrumentation
+        run: ./build.sh BuildTracer
+      - name: Run core managed tests
+        run: |
+          ./build.cmd \
+            --target ManagedTests \
+            --test-project OpenTelemetry.AutoInstrumentation.Tests \
+            --test-target-framework net8.0 \
+            --containers none
+      - name: Package Beacon candidate
+        run: |
+          bash beacon/scripts/package.sh \
+            --input bin/tracer-home \
+            --target linux-glibc-x64 \
+            --output bin/beacon-artifacts
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: beacon-dotnet-linux-glibc-x64
+          path: bin/beacon-artifacts/
+          if-no-files-found: error
