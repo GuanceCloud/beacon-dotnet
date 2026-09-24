@@ -5,6 +5,11 @@
 
 ## Unreleased
 
+## 0.1.3 - 2026-09-25
+
+- 修复跨 GitHub Actions artifact 传递后 `instrument.sh` 执行位丢失的问题。
+- Shell 安装器解压后防御性恢复 `instrument.sh` 执行位。
+
 ## 0.1.2 - 2026-09-24
 
 - 安装脚本改为强制验证由 Beacon 发行工作流生成的 artifact attestation，不再

@@ -83,6 +83,10 @@ jobs:
               --directory "${source_directory}" \
               --target "${target}" >/dev/null
 
+            if [[ -f "${source_directory}/instrument.sh" ]]; then
+              chmod +x "${source_directory}/instrument.sh"
+            fi
+
             archive="beacon-dotnet-auto-${version}-${suffix}.zip"
             (
               cd "${source_directory}"

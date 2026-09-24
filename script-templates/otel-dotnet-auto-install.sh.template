@@ -158,3 +158,7 @@ fi
 
 rm -rf "$OTEL_DOTNET_AUTO_HOME"
 unzip -q "$ARCHIVE_PATH" -d "$OTEL_DOTNET_AUTO_HOME"
+
+if [ -f "$OTEL_DOTNET_AUTO_HOME/instrument.sh" ]; then
+  chmod +x "$OTEL_DOTNET_AUTO_HOME/instrument.sh"
+fi
