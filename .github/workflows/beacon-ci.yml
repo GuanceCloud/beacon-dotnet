@@ -3,6 +3,7 @@ name: Beacon .NET CI
 on:
   push:
     branches: [main]
+    tags: [beacon-v*]
   pull_request:
   workflow_dispatch:
 
@@ -29,6 +30,11 @@ jobs:
       - uses: ./.github/actions/setup-dotnet
       - name: Check Beacon metadata
         run: bash beacon/scripts/check-version.sh
+      - name: Check Beacon release tag
+        if: startsWith(github.ref, 'refs/tags/beacon-v')
+        env:
+          BEACON_RELEASE_TAG: ${{ github.ref_name }}
+        run: bash beacon/scripts/check-version.sh
       - name: Test Beacon packaging
         run: bash beacon/scripts/package.test.sh
       - name: Build automatic instrumentation
@@ -46,8 +52,88 @@ jobs:
             --input bin/tracer-home \
             --target linux-glibc-x64 \
             --output bin/beacon-artifacts
+      - name: Validate packaged candidate
+        run: |
+          set -euo pipefail
+          archive="$(find bin/beacon-artifacts -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          test -n "${archive}"
+          checksum="${archive}.sha256"
+          test -f "${checksum}"
+          (
+            cd "$(dirname "${archive}")"
+            sha256sum --check "$(basename "${checksum}")"
+          )
+
+          mv bin/tracer-home bin/tracer-home-build
+          mkdir -p bin/tracer-home
+          unzip -q "${archive}" -d bin/tracer-home
+
+          dotnet build \
+            test/test-applications/integrations/TestApplication.Smoke/TestApplication.Smoke.csproj \
+            --framework net8.0 \
+            --configuration Release \
+            -p:Platform=x64
+          dotnet build \
+            test/test-applications/integrations/TestApplication.Http/TestApplication.Http.csproj \
+            --framework net8.0 \
+            --configuration Release \
+            -p:Platform=x64
+          dotnet build \
+            test/IntegrationTests/IntegrationTests.csproj \
+            --framework net8.0 \
+            --configuration Release \
+            -p:Platform=x64
+
+          mkdir -p test-artifacts/release-validation
+          dotnet vstest \
+            test/IntegrationTests/bin/x64/Release/net8.0/IntegrationTests.dll \
+            --Tests:IntegrationTests.SmokeTests.OtlpTracesExporter,IntegrationTests.SmokeTests.SubmitMetrics,IntegrationTests.SmokeTests.LogsResource \
+            '--Logger:trx;LogFileName=beacon-release-functional.trx' \
+            --ResultsDirectory:test-artifacts/release-validation
+          dotnet vstest \
+            test/IntegrationTests/bin/x64/Release/net8.0/IntegrationTests.dll \
+            --Tests:IntegrationTests.HttpTests.SubmitTraces,IntegrationTests.HttpTests.SubmitMetrics \
+            '--Logger:trx;LogFileName=beacon-release-aspnetcore.trx' \
+            --ResultsDirectory:test-artifacts/release-validation
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: beacon-dotnet-linux-glibc-x64
           path: bin/beacon-artifacts/
           if-no-files-found: error
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: beacon-dotnet-release-validation-linux-glibc-x64
+          path: test-artifacts/release-validation/
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/beacon-v')
+    needs: linux-x64
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: beacon-dotnet-linux-glibc-x64
+          path: bin/beacon-artifacts
+      - name: Publish GitHub Release
+        env:
+          BEACON_RELEASE_TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash beacon/scripts/check-version.sh
+          version="$(sed -n 's/^beacon\.version=//p' beacon/version.properties)"
+          notes="beacon/release-notes/${version}.md"
+          test -f "${notes}"
+          gh release create "${BEACON_RELEASE_TAG}" \
+            bin/beacon-artifacts/*.zip \
+            bin/beacon-artifacts/*.sha256 \
+            --verify-tag \
+            --title "Beacon .NET ${version}" \
+            --notes-file "${notes}"

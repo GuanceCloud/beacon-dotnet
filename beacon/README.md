@@ -8,11 +8,12 @@
 ## 当前状态
 
 - 已从官方 `v1.17.0` 固定基线建立非 Fork 下游工程并保留上游历史。
-- 已定义 Beacon 独立产品版本、来源检查和 Linux/macOS/Windows 通用 ZIP
-  归档规则。
-- 尚未实现 Beacon 自有运行时增强，尚未完成 Windows、macOS、Linux、不同
-  架构、NuGet 部署模式及 DataKit 接收链路验收。
-- 当前没有 Beacon .NET 正式发行或安装入口。
+- Beacon `0.1.0` 首版支持 Linux glibc x64 上的 .NET 8 应用，以通用 ZIP
+  归档发布。
+- 发布制品使用真实控制台和 ASP.NET Core 应用验证 OTLP Trace、Metric、Log
+  导出，并保存自动化测试结果。
+- 尚未实现 Beacon 自有运行时增强；Windows、macOS、Linux musl、ARM64、
+  NuGet 部署模式及 DataKit 接收链路尚未纳入已验证支持范围。
 
 这些状态只描述工程准备情况，不把上游支持范围自动视为 Beacon 已验证范围。
 
@@ -53,6 +54,7 @@ StartupHook、托管与原生 Runtime 等配套包。完成整套包图的命名
 - [制品与发行准备](RELEASING.md)
 - [Beacon Changelog](CHANGELOG.md)
 
-日常自动 CI 只检查 Beacon 元数据、打包脚本并完成一个 Linux x64 构建入口；
-上游完整多平台与集成测试保留为手动专项验证。具体支持范围只能由候选制品在目标
-环境中的实际结果确定。
+日常自动 CI 检查 Beacon 元数据、打包脚本，完成 Linux x64 构建，并针对打包后
+的同一份归档运行 .NET 8 OTLP Trace、Metric、Log 及 ASP.NET Core 客户端/服务端
+自动插桩验证。上游完整多平台与集成测试保留为手动专项验证，未列入首版支持范围
+的平台不能由 Linux x64 结果推断。
