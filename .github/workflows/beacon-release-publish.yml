@@ -115,9 +115,12 @@ jobs:
             --source-ref "refs/tags/${RELEASE_TAG}"
 
           install_directory="${RUNNER_TEMP}/beacon-dotnet-auto"
+          log_directory="${RUNNER_TEMP}/beacon-dotnet-auto-logs"
+          mkdir -p "${log_directory}"
           VERSION="${RELEASE_TAG}" OTEL_DOTNET_AUTO_HOME="${install_directory}" sh "${installer}"
           test -f "${install_directory}/BEACON-METADATA.json"
           OTEL_DOTNET_AUTO_HOME="${install_directory}" \
+            OTEL_DOTNET_AUTO_LOG_DIRECTORY="${log_directory}" \
             OTEL_SERVICE_NAME="beacon-release-validation" \
             OTEL_TRACES_EXPORTER=none \
             OTEL_METRICS_EXPORTER=none \
@@ -195,7 +198,9 @@ jobs:
                 SKIP_RELEASE_VERIFICATION=true \
                 sh /release/otel-dotnet-auto-install.sh
               test -f /tmp/beacon-dotnet-auto/BEACON-METADATA.json
+              mkdir -p /tmp/beacon-dotnet-auto-logs
               OTEL_DOTNET_AUTO_HOME=/tmp/beacon-dotnet-auto \
+                OTEL_DOTNET_AUTO_LOG_DIRECTORY=/tmp/beacon-dotnet-auto-logs \
                 OTEL_SERVICE_NAME=beacon-release-validation \
                 OTEL_TRACES_EXPORTER=none \
                 OTEL_METRICS_EXPORTER=none \
