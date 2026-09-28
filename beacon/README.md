@@ -3,7 +3,7 @@
 本仓库维护完整
 [OpenTelemetry .NET Automatic Instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet-instrumentation)
 源码，并在其上准备 Beacon .NET 产品制品。产品总入口为
-[GuanceCloud/beacon](https://github.com/GuanceCloud/beacon)。
+[beacon-observability/beacon](https://github.com/beacon-observability/beacon)。
 
 ## 当前状态
 
