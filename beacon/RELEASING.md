@@ -24,6 +24,11 @@ beacon-dotnet-auto-<版本>-linux-musl-arm64.zip
 beacon-dotnet-auto-<版本>-windows.zip
 beacon-dotnet-auto-<版本>-macos.zip
 beacon-dotnet-auto-<版本>-nuget-packages.zip
+beacon-dotnet-<版本>-linux-amd64.deb
+beacon-dotnet-<版本>-linux-arm64.deb
+beacon-dotnet-<版本>-linux-x86_64.rpm
+beacon-dotnet-<版本>-linux-aarch64.rpm
+beacon-dotnet-<版本>-windows-x64.msi
 otel-dotnet-auto-install.sh
 OpenTelemetry.DotNet.Auto.psm1
 checksums.txt
@@ -33,6 +38,10 @@ sbom.spdx.json
 GitHub 还会自动提供源码归档和 Release attestation。平台归档保留上游内部文件名，
 并额外包含 `BEACON-METADATA.json`，记录 Beacon 版本、目标平台、源码提交以及
 上游标签和提交。NuGet 聚合归档保留上游兼容包 ID。
+
+DEB/RPM 与 MSI 也必须包含在统一校验和及 artifact attestation 中。当前尚未接入
+Windows Authenticode 和 APT/RPM 软件源签名，公开安装前必须先验证 GitHub
+attestation；接入正式签名凭据后才能宣称操作系统原生信任。
 
 本地为已经构建的目录写入元数据并打包时可执行：
 
@@ -51,11 +60,12 @@ bash beacon/scripts/package.sh \
 1. 固定最终源码提交、上游基线、依赖和构建环境，确认许可证及第三方声明。
 2. 让主分支 CI 与完整多平台专项 CI 通过。
 3. 推送与 `version.properties` 一致的 `beacon-v<版本>` 标签。
-4. 标签工作流构建全部平台及 NuGet 制品，生成安装脚本、校验和、SBOM 和证明，
+4. 标签工作流构建全部平台、NuGet、MSI、DEB/RPM 制品，生成安装脚本、校验和、SBOM 和证明，
    校验归档后创建草稿 Release。
 5. 人工检查草稿中的文件数、名称、校验和、元数据和发布说明，再发布草稿。
 6. 发布后工作流从公开 Release 下载安装，在 Windows、macOS、Linux glibc/musl
-   的 x64 与 ARM64 运行 .NET 8 应用，并验证下载文件的 artifact attestation。
+   的 x64 与 ARM64 运行 .NET 8 应用，并验证下载文件的 artifact attestation；
+   MSI、DEB/RPM 还必须完成真实安装、运行和卸载闭环。
 
 所有验证成功后才可宣布版本可用。已发布标签和制品不可覆盖；失败后修复代码并
 递增版本。DataKit 接收链路仍需独立端到端验收，不能由 OTLP 导出测试推断。

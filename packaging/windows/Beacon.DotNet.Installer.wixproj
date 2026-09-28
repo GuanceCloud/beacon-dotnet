@@ -1,0 +1,14 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <OutputName>beacon-dotnet-$(PackageVersion)-windows-x64</OutputName>
+    <DefineConstants>PayloadDir=$(PayloadDir);ProductVersion=$(ProductVersion)</DefineConstants>
+  </PropertyGroup>
+
+  <Target Name="ValidatePackageProperties" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(PayloadDir)' == ''" Text="PayloadDir is required." />
+    <Error Condition="'$(ProductVersion)' == ''" Text="ProductVersion is required." />
+    <Error Condition="'$(PackageVersion)' == ''" Text="PackageVersion is required." />
+  </Target>
+</Project>

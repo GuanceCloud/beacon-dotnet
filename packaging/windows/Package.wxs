@@ -1,0 +1,71 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="Beacon .NET Automatic Instrumentation"
+      Manufacturer="Beacon Observability"
+      Version="$(var.ProductVersion)"
+      UpgradeCode="{D9910EAA-2696-46E8-BFAB-B040190A8404}"
+      Scope="perMachine"
+      InstallerVersion="500">
+    <MajorUpgrade
+        DowngradeErrorMessage="A newer version of Beacon .NET is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="BeaconProgramFilesFolder" Name="Beacon">
+        <Directory Id="INSTALLFOLDER" Name="dotnet" />
+      </Directory>
+    </StandardDirectory>
+
+    <Files Include="$(var.PayloadDir)\**" Directory="INSTALLFOLDER" />
+
+    <Component Id="BeaconMachineRegistration" Directory="INSTALLFOLDER" Guid="{BD446E37-DB02-4236-9D43-5EC34B4B0A75}">
+      <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Beacon Observability\Beacon .NET"
+          Name="InstallDir"
+          Value="[INSTALLFOLDER]"
+          Type="string"
+          KeyPath="yes" />
+      <RegistryValue
+          Root="HKLM"
+          Key="SOFTWARE\Beacon Observability\Beacon .NET"
+          Name="ProductCode"
+          Value="[ProductCode]"
+          Type="string" />
+      <Environment
+          Id="BeaconInstallDirectoryEnvironment"
+          Name="OTEL_DOTNET_AUTO_INSTALL_DIR"
+          Value="[INSTALLFOLDER]"
+          Action="set"
+          Part="all"
+          System="yes" />
+      <Environment
+          Id="BeaconCommandPathEnvironment"
+          Name="PATH"
+          Value="[INSTALLFOLDER]"
+          Action="set"
+          Part="last"
+          System="yes" />
+    </Component>
+
+    <CustomAction
+        Id="RegisterBeaconAssemblies"
+        Directory="INSTALLFOLDER"
+        ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -ExecutionPolicy Bypass -Command &quot;Import-Module '.\OpenTelemetry.DotNet.Auto.psm1'; Register-AssembliesInGAC&quot;"
+        Execute="deferred"
+        Impersonate="no"
+        Return="check" />
+    <CustomAction
+        Id="UnregisterBeaconInstallation"
+        Directory="INSTALLFOLDER"
+        ExeCommand="&quot;[System64Folder]WindowsPowerShell\v1.0\powershell.exe&quot; -NoLogo -NoProfile -ExecutionPolicy Bypass -Command &quot;Import-Module '.\OpenTelemetry.DotNet.Auto.psm1'; Unregister-OpenTelemetryInstallation&quot;"
+        Execute="deferred"
+        Impersonate="no"
+        Return="check" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RegisterBeaconAssemblies" After="WriteEnvironmentStrings" Condition="NOT Installed" />
+      <Custom Action="UnregisterBeaconInstallation" Before="RemoveEnvironmentStrings" Condition="REMOVE = &quot;ALL&quot;" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

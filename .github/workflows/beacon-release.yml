@@ -30,16 +30,110 @@ jobs:
     needs: [build-windows, build]
     uses: ./.github/workflows/build-nuget-packages.yml
 
+  build-windows-installer:
+    name: Build and validate Windows MSI
+    needs: build-windows
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup-dotnet
+      - name: Download Windows payload
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bin-windows-2022
+          path: bin/tracer-home
+      - name: Download PowerShell module
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: installation-scripts-windows-2022
+          path: bin/installation-scripts
+      - name: Build MSI
+        shell: pwsh
+        run: |
+          bash beacon/scripts/write-metadata.sh `
+            --directory bin/tracer-home `
+            --target windows-x64-x86
+          ./packaging/windows/build-msi.ps1 `
+            -InputDirectory bin/tracer-home `
+            -ModulePath bin/installation-scripts/OpenTelemetry.DotNet.Auto.psm1 `
+            -OutputDirectory bin/native-packages
+      - name: Validate MSI lifecycle
+        shell: powershell
+        run: |
+          $msiFiles = @(Get-ChildItem bin/native-packages -Filter *.msi)
+          if ($msiFiles.Count -ne 1) { throw "Expected exactly one MSI." }
+          ./packaging/windows/test-msi.ps1 -MsiPath $msiFiles[0].FullName
+      - name: Upload MSI
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-packages-windows
+          path: bin/native-packages/*.msi
+          if-no-files-found: error
+
+  build-linux-installers:
+    name: Build Linux packages on ${{ matrix.machine }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - machine: ubuntu-22.04
+            artifact: ubuntu-22.04
+            architecture: amd64
+          - machine: ubuntu-22.04-arm
+            artifact: ubuntu-22.04-arm
+            architecture: arm64
+    runs-on: ${{ matrix.machine }}
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download Linux payload
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: bin-${{ matrix.artifact }}
+          path: bin/tracer-home
+      - name: Build DEB and RPM
+        shell: bash
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          if ! command -v rpmbuild >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes rpm
+          fi
+          bash packaging/linux/build-packages.sh \
+            --input bin/tracer-home \
+            --output bin/native-packages \
+            --architecture "${ARCHITECTURE}"
+      - name: Upload native Linux packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-packages-linux-${{ matrix.architecture }}
+          path: |
+            bin/native-packages/*.deb
+            bin/native-packages/*.rpm
+          if-no-files-found: error
+
   create-release:
     name: Create verified draft release
     runs-on: ubuntu-24.04
-    needs: [build-windows, build, build-nuget-packages]
+    needs: [build-windows, build, build-nuget-packages, build-windows-installer, build-linux-installers]
     permissions:
       attestations: write
       contents: write
       id-token: write
       artifact-metadata: write
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -95,6 +189,14 @@ jobs:
             unzip -q "${archive}" -d "${sbom_source}/${suffix}"
           done
 
+      - name: Collect native packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp ./native-packages-linux-amd64/*.deb ./native-packages-linux-amd64/*.rpm .
+          cp ./native-packages-linux-arm64/*.deb ./native-packages-linux-arm64/*.rpm .
+          cp ./native-packages-windows/*.msi .
+
       - name: Generate SBOM from release archives
         uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
         with:
@@ -132,8 +234,14 @@ jobs:
               '.version == $version and .sourceCommit == $source_commit' >/dev/null
           done
 
+          mapfile -t native_packages < <(find . -maxdepth 1 -type f \
+            \( -name 'beacon-dotnet-*.deb' -o -name 'beacon-dotnet-*.rpm' -o -name 'beacon-dotnet-*.msi' \) \
+            -printf '%f\n' | LC_ALL=C sort)
+          test "${#native_packages[@]}" -eq 5
+
           artifacts=(
             "${archives[@]}"
+            "${native_packages[@]}"
             "OpenTelemetry.DotNet.Auto.psm1"
             "otel-dotnet-auto-install.sh"
             "sbom.spdx.json"
@@ -146,6 +254,9 @@ jobs:
         with:
           subject-path: |
             ./beacon-dotnet-auto-*.zip
+            ./beacon-dotnet-*.deb
+            ./beacon-dotnet-*.rpm
+            ./beacon-dotnet-*.msi
             ./otel-dotnet-auto-install.sh
             ./OpenTelemetry.DotNet.Auto.psm1
             ./checksums.txt
@@ -197,6 +308,9 @@ jobs:
           test -f "${notes}"
           gh release create "${GITHUB_REF_NAME}" \
             ./beacon-dotnet-auto-*.zip \
+            ./beacon-dotnet-*.deb \
+            ./beacon-dotnet-*.rpm \
+            ./beacon-dotnet-*.msi \
             ./otel-dotnet-auto-install.sh \
             ./OpenTelemetry.DotNet.Auto.psm1 \
             ./checksums.txt \

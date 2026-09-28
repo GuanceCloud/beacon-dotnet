@@ -10,6 +10,8 @@
 - 已从官方 `v1.17.0` 固定基线建立非 Fork 下游工程并保留上游历史。
 - Beacon `0.1.4` 发布 Linux glibc/musl x64 与 ARM64、Windows、macOS 和
   NuGet 归档，并提供 Shell 与 PowerShell 安装脚本。
+- `Unreleased` 增加 Windows MSI、Linux DEB/RPM 与跨平台 `beacon-dotnet`
+  状态、运行和卸载入口；原生包生命周期由系统安装器管理。
 - 构建阶段使用真实控制台和 ASP.NET Core 应用验证 OTLP Trace、Metric、Log；
   发布后再次从 GitHub Release 下载安装并运行 .NET 8 应用。
 - 发布附带统一 SHA-256 清单、SPDX SBOM 和 GitHub 构建证明。
@@ -24,6 +26,7 @@
 | [`src`](../src/)     | 托管自动插桩、启动 Hook、Loader 和原生 CLR Profiler |
 | [`nuget`](../nuget/) | 上游兼容 NuGet 包布局；以聚合归档形式发布           |
 | [`build`](../build/) | Nuke 构建与测试入口                                 |
+| [`packaging`](../packaging/) | MSI、DEB/RPM 与安装管理命令                  |
 | [`docs`](../docs/)   | 继承的 OpenTelemetry 使用和实现文档                 |
 | [`beacon`](./)       | Beacon 版本、来源、打包、同步与发行说明             |
 
@@ -44,6 +47,10 @@ checksums.txt
 NuGet 聚合归档保留上游包 ID，因为主包依赖 BuildTasks、Loader、StartupHook、
 托管与原生 Runtime 等配套包。完成整套包图的命名、依赖、升级与兼容性验证前，
 不发布虚假的 `Beacon.AutoInstrumentation` 包。
+
+原生包安装到 Linux `/opt/beacon/dotnet` 或 Windows
+`%ProgramFiles%\Beacon\dotnet`，并提供 `beacon-dotnet` 命令。它们复用同一份
+平台归档内容，不建立第二套探针二进制。
 
 ## 维护入口
 
