@@ -13,6 +13,23 @@ Linux musl、Windows、macOS 和 NuGet 发布归档，覆盖 x64 与适用的 AR
 继承的 OpenTelemetry 使用与实现文档见
 [OpenTelemetry .NET Automatic Instrumentation](docs/README.md)。
 
+## 卸载
+
+Linux 与 macOS 安装后可直接运行：
+
+```sh
+sh "$HOME/.otel-dotnet-auto/uninstall.sh"
+```
+
+Windows 以管理员身份运行安装目录中的卸载脚本：
+
+```powershell
+& "$env:ProgramFiles\OpenTelemetry .NET AutoInstrumentation\uninstall.ps1"
+```
+
+该命令会清理当前会话，并自动识别和清理使用当前 Beacon 安装目录的 IIS 与
+Windows Service 注册项；详细选项见[使用文档](docs/README.md#powershell-module-windows)。
+
 ## Beacon Contributors
 
 <table>

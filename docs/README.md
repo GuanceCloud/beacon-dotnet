@@ -260,6 +260,23 @@ The installer copies the archive into a unique `otel-dotnet-auto.XXXXXX`
 directory under `${TMPDIR:-/tmp}` before verification and extraction. When
 `DOWNLOAD_DIR` is not set, this directory is also used for the download.
 
+Uninstall with the helper placed in the installation directory:
+
+```sh
+sh "$HOME/.otel-dotnet-auto/uninstall.sh"
+```
+
+For a custom installation directory, run its `uninstall.sh`, or reuse a
+downloaded installer with the same `OTEL_DOTNET_AUTO_HOME` value:
+
+```sh
+OTEL_DOTNET_AUTO_HOME=/custom/path sh ./otel-dotnet-auto-install.sh --uninstall
+```
+
+Uninstallation is idempotent and refuses to remove a directory that does not
+contain `BEACON-METADATA.json`. Start a new shell afterwards so applications do
+not inherit instrumentation variables from an existing instrumented session.
+
 [instrument.sh](../instrument.sh) script
 uses environment variables as parameters:
 
@@ -340,8 +357,7 @@ try {
     # -LocalPath "C:\Path\To\OpenTelemetry.zip"
     Install-OpenTelemetryCore -SkipReleaseVerification:$skip_release_verification -ErrorAction Stop
 
-    # Cache the verified module for updates and uninstallation.
-    Copy-Item -LiteralPath $download_path -Destination (Get-OpenTelemetryInstallDirectory) -Force
+    # The verified module and a standalone uninstall.ps1 are cached automatically.
 }
 finally {
     if (Test-Path -LiteralPath $download_dir) {
@@ -397,19 +413,16 @@ Uninstalling OpenTelemetry:
 # PowerShell 5.1 is required
 #Requires -PSEdition Desktop
 
-# Import the previously downloaded module. After installation or an update the module is found in the default install directory.
-# Note: It's best to use the same version of the module for installation and uninstallation to ensure proper removal.
-Import-Module "C:\Program Files\OpenTelemetry .NET AutoInstrumentation\OpenTelemetry.DotNet.Auto.psm1"
-
-# If IIS was previously registered, unregister it.
-Unregister-OpenTelemetryForIIS
-
-# If Windows services were previously registered, unregister them.
-Unregister-OpenTelemetryForWindowsService -WindowsServiceName MyServiceName
-
-# Finally, uninstall OpenTelemetry instrumentation
-Uninstall-OpenTelemetryCore
+# Automatically import the matching module, clean the current session, IIS and
+# every Windows service registered with this installation, then remove all files.
+& "C:\Program Files\OpenTelemetry .NET AutoInstrumentation\uninstall.ps1"
 ```
+
+By default, IIS is reset and each affected running Windows service is restarted
+so that it releases the profiler. Pass `-NoReset` to `uninstall.ps1` when restart
+timing is managed separately. After importing the cached module, the equivalent
+command is `Uninstall-OpenTelemetry`. The lower-level unregister and
+`Uninstall-OpenTelemetryCore` commands remain available for advanced workflows.
 
 #### Update .NET Framework version
 

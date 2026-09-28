@@ -17,6 +17,8 @@
 #Requires -RunAsAdministrator
 
 $ServiceLocatorVariable = "OTEL_DOTNET_AUTO_INSTALL_DIR"
+$InstallModuleName = "OpenTelemetry.DotNet.Auto.psm1"
+$UninstallScriptName = "uninstall.ps1"
 $ReleaseRepository = "beacon-observability/beacon-dotnet"
 $ReleaseWorkflow = "$ReleaseRepository/.github/workflows/beacon-release.yml"
 
@@ -102,6 +104,26 @@ function Prepare-Install-Directory([string]$InstallDir) {
     }
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+}
+
+function Install-Management-Scripts([string]$InstallDir, [byte[]]$ModuleBytes) {
+    $modulePath = Join-Path $InstallDir $InstallModuleName
+    [System.IO.File]::WriteAllBytes($modulePath, $ModuleBytes)
+
+    $uninstallScript = @'
+#Requires -Version 5.1
+#Requires -RunAsAdministrator
+
+param(
+    [switch]$NoReset
+)
+
+$modulePath = Join-Path $PSScriptRoot "OpenTelemetry.DotNet.Auto.psm1"
+Import-Module $modulePath -Force
+Uninstall-OpenTelemetry -NoReset:$NoReset
+'@
+    $uninstallPath = Join-Path $InstallDir $UninstallScriptName
+    Set-Content -LiteralPath $uninstallPath -Value $uninstallScript -Encoding UTF8
 }
 
 function Reset-IIS() {    
@@ -418,6 +440,7 @@ function Install-OpenTelemetryCore() {
     $downloadDir = $null
     $archivePath = $null
     $githubCLIPath = $null
+    $moduleBytes = [System.IO.File]::ReadAllBytes($PSCommandPath)
 
     Assert-Release-Version $version
 
@@ -443,6 +466,10 @@ function Install-OpenTelemetryCore() {
 
             # Extract files from zip
             Expand-Archive $archivePath $installDir -Force
+
+            # Keep the exact module that performed the verified installation and
+            # provide a standalone one-command uninstaller.
+            Install-Management-Scripts -InstallDir $installDir -ModuleBytes $moduleBytes
 
             # OpenTelemetry service locator
             [System.Environment]::SetEnvironmentVariable($ServiceLocatorVariable, $installDir, [System.EnvironmentVariableTarget]::Machine)
@@ -496,6 +523,66 @@ function Uninstall-OpenTelemetryCore() {
 
     # Remove OTel service locator variable
     [System.Environment]::SetEnvironmentVariable($ServiceLocatorVariable, $null, [System.EnvironmentVariableTarget]::Machine)
+}
+
+function Get-Registered-WindowsServiceNames([string]$InstallDir) {
+    $regPath = "HKLM:SYSTEM\CurrentControlSet\Services\"
+    $homeVariable = "OTEL_DOTNET_AUTO_HOME=$InstallDir"
+
+    Get-ChildItem -Path $regPath | ForEach-Object {
+        $environment = (Get-ItemProperty -LiteralPath $_.PSPath -Name Environment -ErrorAction SilentlyContinue).Environment
+        if ($environment -and ($environment | Where-Object { $_ -ieq $homeVariable })) {
+            $_.PSChildName
+        }
+    }
+}
+
+<#
+    .SYNOPSIS
+    Completely uninstalls OpenTelemetry .NET Automatic Instrumentation.
+    .DESCRIPTION
+    Clears the current PowerShell session, automatically finds IIS and Windows
+    services registered with the current installation, removes their
+    instrumentation variables, and then removes the core files.
+    .PARAMETER NoReset
+    Does not reset IIS or restart running Windows services after cleanup.
+#>
+function Uninstall-OpenTelemetry() {
+    param(
+        [switch]$NoReset
+    )
+
+    $installDir = Get-Current-InstallDir
+    Unregister-OpenTelemetryForCurrentSession
+
+    if (-not $installDir) {
+        Write-Information -MessageData "Beacon .NET Automatic Instrumentation is already uninstalled." -InformationAction Continue
+        return
+    }
+
+    $registeredServices = @(Get-Registered-WindowsServiceNames -InstallDir $installDir)
+    $iisServices = @($registeredServices | Where-Object { $_ -in @("W3SVC", "WAS") })
+    $windowsServices = @($registeredServices | Where-Object { $_ -notin @("W3SVC", "WAS") })
+
+    foreach ($serviceName in $registeredServices) {
+        Cleanup-Environment-Variables -WindowsServiceName $serviceName
+    }
+
+    if (-not $NoReset) {
+        if ($iisServices.Count -gt 0) {
+            Reset-IIS
+        }
+
+        foreach ($serviceName in $windowsServices) {
+            $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+            if ($service -and $service.Status -eq [System.ServiceProcess.ServiceControllerStatus]::Running) {
+                Restart-Service -Name $serviceName -Force
+            }
+        }
+    }
+
+    Uninstall-OpenTelemetryCore
+    Write-Information -MessageData "Beacon .NET Automatic Instrumentation was completely uninstalled." -InformationAction Continue
 }
 
 <#
@@ -568,8 +655,7 @@ function Update-OpenTelemetryCore() {
         # Release module
         Remove-Module OpenTelemetry.Dotnet.Auto
 
-        # Cache install module
-        Move-Item -LiteralPath $modulePath -Destination $installDir
+        # Install-OpenTelemetryCore caches this verified module in the install directory.
     }
     finally {
         if ($updateDir -and (Test-Path -LiteralPath $updateDir)) {
@@ -807,6 +893,7 @@ Export-ModuleMember -Function Register-OpenTelemetryForIIS
 Export-ModuleMember -Function Register-OpenTelemetryForWindowsService
 Export-ModuleMember -Function Register-OpenTelemetryForCurrentSession
 Export-ModuleMember -Function Uninstall-OpenTelemetryCore
+Export-ModuleMember -Function Uninstall-OpenTelemetry
 Export-ModuleMember -Function Update-OpenTelemetryCore
 Export-ModuleMember -Function Unregister-OpenTelemetryForIIS
 Export-ModuleMember -Function Unregister-OpenTelemetryForWindowsService

@@ -5,6 +5,9 @@
 
 ## Unreleased
 
+- Linux/macOS 安装目录新增 `uninstall.sh`，安装器支持 `--uninstall`；Windows
+  安装时自动生成 `uninstall.ps1`，一键清理当前会话、IIS、已注册 Windows 服务和核心文件。
+
 ## 0.1.3 - 2026-09-25
 
 - 修复跨 GitHub Actions artifact 传递后 `instrument.sh` 执行位丢失的问题。
