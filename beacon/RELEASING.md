@@ -11,7 +11,8 @@ post-publication validation.
   source for the Beacon product version.
 - Development candidates use SemVer versions such as `0.2.0-alpha.1` and
   `0.2.0-rc.1`. Stable releases use `X.Y.Z`.
-- Beacon tags use `beacon-v<version>` and do not reuse upstream `v*` tags.
+- Beacon product tags use the standard `v<version>` format. The upstream
+  baseline tag remains in the repository for source provenance.
 - The Beacon product version is maintained independently of the upstream
   baseline in [`upstream.lock.json`](upstream.lock.json). Do not globally
   replace upstream assembly versions, NuGet dependencies, or instrumentation
@@ -71,7 +72,7 @@ platform-specific validation.
    environment. Confirm licenses and third-party notices.
 2. Require the main-branch CI and the complete multi-platform release checks to
    pass.
-3. Push a `beacon-v<version>` tag that matches `version.properties`.
+3. Push a `v<version>` tag that matches `version.properties`.
 4. The tag workflow builds every platform plus NuGet, MSI, and DEB/RPM assets;
    generates installers, checksums, an SBOM, and attestations; validates the
    archives; and creates a draft Release.

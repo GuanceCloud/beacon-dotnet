@@ -19,7 +19,7 @@ printf '%s\n' '#!/bin/sh' > "${test_root}/package/instrument.sh"
 )
 
 install_dir="${test_root}/install with spaces"
-VERSION=beacon-v0.0.0 \
+VERSION=v0.0.0 \
   OS_TYPE=linux-glibc \
   ARCHITECTURE=x64 \
   SKIP_RELEASE_VERIFICATION=true \
@@ -33,7 +33,7 @@ sh "${install_dir}/uninstall.sh"
 [[ ! -e "${install_dir}" ]]
 
 # The downloaded installer can also remove an existing installation directly.
-VERSION=beacon-v0.0.0 \
+VERSION=v0.0.0 \
   OS_TYPE=linux-glibc \
   ARCHITECTURE=x64 \
   SKIP_RELEASE_VERIFICATION=true \

@@ -14,7 +14,7 @@ permissions:
 jobs:
   msi-installer:
     name: MSI installer on ${{ matrix.machine }}
-    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    if: startsWith(github.event.release.tag_name, 'v')
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +37,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          $version = $env:RELEASE_TAG -replace '^beacon-v', ''
+          $version = $env:RELEASE_TAG -replace '^v', ''
           $asset = "beacon-dotnet-$version-windows-x64.msi"
           $msi = Join-Path $env:RUNNER_TEMP $asset
           gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern $asset --dir $env:RUNNER_TEMP
@@ -50,7 +50,7 @@ jobs:
 
   powershell-installer:
     name: PowerShell installer on ${{ matrix.machine }}
-    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    if: startsWith(github.event.release.tag_name, 'v')
     strategy:
       fail-fast: false
       matrix:
@@ -109,7 +109,7 @@ jobs:
 
   deb-installer:
     name: DEB installer on ${{ matrix.machine }}
-    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    if: startsWith(github.event.release.tag_name, 'v')
     strategy:
       fail-fast: false
       matrix:
@@ -138,7 +138,7 @@ jobs:
           PACKAGE_ARCHITECTURE: ${{ matrix.architecture }}
         run: |
           set -euo pipefail
-          version="${RELEASE_TAG#beacon-v}"
+          version="${RELEASE_TAG#v}"
           asset="beacon-dotnet-${version}-linux-${PACKAGE_ARCHITECTURE}.deb"
           gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
             --pattern "${asset}" --dir "${RUNNER_TEMP}"
@@ -157,7 +157,7 @@ jobs:
 
   rpm-installer:
     name: RPM installer on ${{ matrix.machine }}
-    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    if: startsWith(github.event.release.tag_name, 'v')
     strategy:
       fail-fast: false
       matrix:
@@ -184,7 +184,7 @@ jobs:
           PACKAGE_ARCHITECTURE: ${{ matrix.architecture }}
         run: |
           set -euo pipefail
-          version="${RELEASE_TAG#beacon-v}"
+          version="${RELEASE_TAG#v}"
           asset="beacon-dotnet-${version}-linux-${PACKAGE_ARCHITECTURE}.rpm"
           gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
             --pattern "${asset}" --dir "${RUNNER_TEMP}"
@@ -210,7 +210,7 @@ jobs:
 
   unix-installer:
     name: Shell installer on ${{ matrix.machine }}
-    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    if: startsWith(github.event.release.tag_name, 'v')
     strategy:
       fail-fast: false
       matrix:
@@ -275,7 +275,7 @@ jobs:
 
   musl-installer:
     name: Shell installer on ${{ matrix.target }}
-    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    if: startsWith(github.event.release.tag_name, 'v')
     strategy:
       fail-fast: false
       matrix:
@@ -303,7 +303,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          version="${RELEASE_TAG#beacon-v}"
+          version="${RELEASE_TAG#v}"
           archive="beacon-dotnet-auto-${version}-${TARGET}.zip"
           gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
             --pattern "${archive}" \
@@ -323,7 +323,7 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          version="${RELEASE_TAG#beacon-v}"
+          version="${RELEASE_TAG#v}"
           archive="beacon-dotnet-auto-${version}-${TARGET}.zip"
           docker build -t beacon-release-alpine -f docker/alpine.dockerfile .
           docker run --rm \
