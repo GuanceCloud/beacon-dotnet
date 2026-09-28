@@ -7,7 +7,6 @@
       Scope="perMachine"
       InstallerVersion="500">
     <MajorUpgrade
-        AllowSameVersionUpgrades="yes"
         DowngradeErrorMessage="A newer version of Beacon .NET is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
