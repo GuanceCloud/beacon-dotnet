@@ -10,6 +10,8 @@ This file records Beacon .NET product changes only. See the root
 - Standardize Beacon product tags and GitHub Releases on the `vX.Y.Z` format.
 - Update Shell and PowerShell installers, release workflows, and validation to
   use standard version tags without the former product-specific prefix.
+- Isolate upstream-derived assembly and NuGet versioning from Beacon product
+  tags so standard `vX.Y.Z` tags cannot lower runtime assembly versions.
 - Refresh historical release links and make the latest release notes easier to
   scan.
 

@@ -13,6 +13,9 @@ post-publication validation.
   `0.2.0-rc.1`. Stable releases use `X.Y.Z`.
 - Beacon product tags use the standard `v<version>` format. The upstream
   baseline tag remains in the repository for source provenance.
+- [`Directory.Build.props`](../Directory.Build.props) isolates the
+  upstream-derived assembly and NuGet version from product tags. Update
+  `BeaconUpstreamDevelopmentVersion` whenever the upstream baseline advances.
 - The Beacon product version is maintained independently of the upstream
   baseline in [`upstream.lock.json`](upstream.lock.json). Do not globally
   replace upstream assembly versions, NuGet dependencies, or instrumentation
