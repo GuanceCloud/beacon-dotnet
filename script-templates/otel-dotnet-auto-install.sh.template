@@ -79,8 +79,8 @@ case "${1:-}" in
 esac
 
 assert_release_version() {
-  if ! printf '%s\n' "$1" | grep -Eq '^beacon-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
-    echo "Invalid release version '$1'. Expected beacon-vMAJOR.MINOR.PATCH or beacon-vMAJOR.MINOR.PATCH-PRERELEASE (for example, beacon-v0.2.0-beta.1)." >&2
+  if ! printf '%s\n' "$1" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+    echo "Invalid release version '$1'. Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-PRERELEASE (for example, v0.2.0-beta.1)." >&2
     return 1
   fi
 }
@@ -179,7 +179,7 @@ else
   exit 1
 fi
 
-test -z "$VERSION" && VERSION="beacon-v{{VERSION}}"
+test -z "$VERSION" && VERSION="v{{VERSION}}"
 
 assert_release_version "$VERSION"
 
@@ -201,7 +201,7 @@ if [ -z "${DOWNLOAD_DIR:-}" ]; then
 fi
 
 RELEASES_URL="https://github.com/$RELEASE_REPOSITORY/releases"
-PRODUCT_VERSION="${VERSION#beacon-v}"
+PRODUCT_VERSION="${VERSION#v}"
 ARCHIVE="beacon-dotnet-auto-$PRODUCT_VERSION-$OS_TYPE.zip"
 
 # In case of Linux, use architecture in the download path

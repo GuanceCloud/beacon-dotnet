@@ -29,7 +29,7 @@ git -C "${repository_root}" cat-file -e "${upstream_commit}^{commit}" 2>/dev/nul
 git -C "${repository_root}" merge-base --is-ancestor "${upstream_commit}" HEAD || fail "upstream commit is not an ancestor of HEAD"
 
 if [[ -n "${BEACON_RELEASE_TAG:-}" ]]; then
-  expected_tag="beacon-v${version}"
+  expected_tag="v${version}"
   [[ "${BEACON_RELEASE_TAG}" == "${expected_tag}" ]] || fail "release tag must be ${expected_tag}"
   [[ "${version}" != *+* ]] || fail "release version cannot contain SemVer build metadata"
 fi

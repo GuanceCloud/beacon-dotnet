@@ -77,7 +77,7 @@ function New-Release-Download-Directory() {
 }
 
 function Assert-Release-Version([string]$Version) {
-    $semanticVersionPattern = '^beacon-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
+    $semanticVersionPattern = '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
     if ($Version -notmatch $semanticVersionPattern) {
         throw "Invalid release version '$Version'."
     }
@@ -144,7 +144,7 @@ function Reset-IIS() {
 }
 
 function Download-OpenTelemetry([string]$Version, [string]$Path) {
-    $productVersion = $Version -replace '^beacon-v', ''
+    $productVersion = $Version -replace '^v', ''
     $archive = "beacon-dotnet-auto-$productVersion-windows.zip"
     $dlUrl = "https://github.com/$ReleaseRepository/releases/download/$Version/$archive"
     $dlPath = Join-Path $Path $archive
@@ -308,7 +308,7 @@ function Filter-Env-List([string[]]$EnvValues, [string[]]$Filters) {
 function Get-OpenTelemetry-Archive([string]$Version, [string]$LocalPath, [string]$DownloadDirectory) {
     if ($LocalPath) {
         if (Test-Path -LiteralPath $LocalPath -PathType Leaf) {
-            $productVersion = $Version -replace '^beacon-v', ''
+            $productVersion = $Version -replace '^v', ''
             $archivePath = Join-Path $DownloadDirectory "beacon-dotnet-auto-$productVersion-windows.zip"
             Copy-Item -LiteralPath $LocalPath -Destination $archivePath -ErrorAction Stop
 
@@ -332,7 +332,7 @@ function Test-AssemblyNotForGAC([string] $Name) {
 function Is-Greater-Version($v1, $v2) {
     # Helper convert version main part to version object
     function ToVersion($version) {
-        return ($version -replace '^beacon-v' -replace '-.+$') -as [version]
+        return ($version -replace '^v' -replace '-.+$') -as [version]
     }
 
     # Helper convert version pre part to version object
@@ -341,7 +341,7 @@ function Is-Greater-Version($v1, $v2) {
         $rank = "alpha", "beta", "rc", $null
         $ranked = $null
 
-        if ($version -match "^beacon-v\d+\.\d+\.\d+?(\-(?<pre>[\w\.]+))") {
+        if ($version -match "^v\d+\.\d+\.\d+?(\-(?<pre>[\w\.]+))") {
             $token = $matches['pre'].split('.')[0]
             $ranked = $matches['pre'] -replace $token, $rank.IndexOf($token)
         }
@@ -452,7 +452,7 @@ function Install-OpenTelemetryCore() {
         throw "Beacon .NET is managed by Windows Installer. Upgrade or repair it with the MSI package."
     }
 
-    $version = "beacon-v{{VERSION}}"
+    $version = "v{{VERSION}}"
     $installDir = Get-CLIInstallDir-From-InstallDir $InstallDir
     $downloadDir = $null
     $archivePath = $null
@@ -934,7 +934,7 @@ function Get-OpenTelemetryInstallVersion() {
     }
 
     $metadata = Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
-    $version = "beacon-v$($metadata.version)"
+    $version = "v$($metadata.version)"
     Assert-Release-Version $version
 
     return $version

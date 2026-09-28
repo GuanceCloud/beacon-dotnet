@@ -2,7 +2,7 @@ name: Beacon .NET Release
 
 on:
   push:
-    tags: [beacon-v*]
+    tags: [v*.*.*]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
