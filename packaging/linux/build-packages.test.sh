@@ -21,6 +21,7 @@ cp /bin/true "${test_root}/input/linux-x64/OpenTelemetry.AutoInstrumentation.Nat
 cp /bin/true "${test_root}/input/linux-arm64/OpenTelemetry.AutoInstrumentation.Native.so"
 cat > "${test_root}/input/instrument.sh" <<'EOF'
 #!/bin/sh
+[ -z "${ARCHITECTURE+x}" ] || exit 86
 exec "$@"
 EOF
 chmod 755 "${test_root}/input/instrument.sh"
@@ -50,7 +51,7 @@ home="${test_root}/deb-extracted/opt/beacon/dotnet"
 status_output="$(BEACON_DOTNET_HOME="${home}" "${cli}" status)"
 grep -q 'Status: installed' <<< "${status_output}"
 [[ "$(BEACON_DOTNET_HOME="${home}" "${cli}" version)" == "$(sed -n 's/^beacon\.version=//p' "${repository_root}/beacon/version.properties")" ]]
-[[ "$(BEACON_DOTNET_HOME="${home}" "${cli}" run printf 'instrumented')" == "instrumented" ]]
+[[ "$(ARCHITECTURE=amd64 BEACON_DOTNET_HOME="${home}" "${cli}" run printf 'instrumented')" == "instrumented" ]]
 
 mapfile -t arm64_outputs < <(bash "${repository_root}/packaging/linux/build-packages.sh" \
   --input "${test_root}/input" \

@@ -71,6 +71,10 @@ case "$command_name" in
     shift
     [ "$#" -gt 0 ] || fail "run requires an application command."
     require_installation
+    # ARCHITECTURE is a build-time override understood by instrument.sh. Native
+    # packages already contain the correct binaries, so do not let an unrelated
+    # host environment variable override runtime architecture detection.
+    unset ARCHITECTURE
     OTEL_DOTNET_AUTO_HOME="$install_dir" exec "$install_dir/instrument.sh" "$@"
     ;;
   uninstall)
