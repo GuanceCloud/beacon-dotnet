@@ -10,5 +10,8 @@ updates:
     directory: "/"
     schedule:
       interval: yearly
+    # Product dependencies follow the pinned upstream baseline. Keep security
+    # updates enabled, but do not open standalone version-update pull requests.
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
