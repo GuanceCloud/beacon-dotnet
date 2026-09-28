@@ -7,7 +7,7 @@
 ## Remote 配置
 
 目标仓库建立后，`origin` 应指向
-`https://github.com/GuanceCloud/beacon-dotnet.git`。官方仓库只配置为
+`https://github.com/beacon-observability/beacon-dotnet.git`。官方仓库只配置为
 `upstream`：
 
 ```bash

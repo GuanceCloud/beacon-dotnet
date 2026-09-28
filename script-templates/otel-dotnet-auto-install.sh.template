@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-RELEASE_REPOSITORY="GuanceCloud/beacon-dotnet"
+RELEASE_REPOSITORY="beacon-observability/beacon-dotnet"
 RELEASE_WORKFLOW="$RELEASE_REPOSITORY/.github/workflows/beacon-release.yml"
 
 assert_release_version() {
