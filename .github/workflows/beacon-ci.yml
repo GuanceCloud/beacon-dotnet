@@ -31,6 +31,13 @@ jobs:
         run: bash beacon/scripts/check-version.sh
       - name: Test Beacon packaging
         run: bash beacon/scripts/package.test.sh
+      - name: Test installation script uninstall
+        run: |
+          sh -n script-templates/otel-dotnet-auto-install.sh.template
+          bash beacon/scripts/uninstall.test.sh
+          # shellcheck disable=SC2016
+          pwsh -NoProfile -Command \
+            '$errors = $null; [void][System.Management.Automation.Language.Parser]::ParseFile("script-templates/OpenTelemetry.DotNet.Auto.psm1.template", [ref]$null, [ref]$errors); if ($errors.Count -ne 0) { throw ($errors | Out-String) }'
       - name: Build automatic instrumentation
         run: ./build.sh BuildTracer
       - name: Run core managed tests

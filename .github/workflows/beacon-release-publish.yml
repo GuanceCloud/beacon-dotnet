@@ -61,8 +61,15 @@ jobs:
           ./bin/Release/net8.0/publish/testapp.exe
           if (-not $?) { throw "Instrumented application failed with exit code $LASTEXITCODE." }
           if (-not (Test-Path (Join-Path $installDirectory "BEACON-METADATA.json"))) { throw "Beacon metadata is missing." }
-          Unregister-OpenTelemetryForCurrentSession
-          Uninstall-OpenTelemetryCore
+          $uninstallPath = Join-Path $installDirectory "uninstall.ps1"
+          if (-not (Test-Path -LiteralPath $uninstallPath)) { throw "Standalone uninstaller is missing." }
+          & $uninstallPath
+          if (Test-Path -LiteralPath $installDirectory) {
+            throw "Installation directory still exists after uninstall: $installDirectory"
+          }
+          if ([System.Environment]::GetEnvironmentVariable("OTEL_DOTNET_AUTO_INSTALL_DIR", [System.EnvironmentVariableTarget]::Machine)) {
+            throw "Installation locator environment variable still exists after uninstall."
+          }
 
   unix-installer:
     name: Shell installer on ${{ matrix.machine }}
@@ -126,6 +133,8 @@ jobs:
             OTEL_METRICS_EXPORTER=none \
             OTEL_LOGS_EXPORTER=none \
             "${install_directory}/instrument.sh" ./bin/Release/net8.0/publish/testapp
+          sh "${install_directory}/uninstall.sh"
+          test ! -e "${install_directory}"
 
   musl-installer:
     name: Shell installer on ${{ matrix.target }}
@@ -206,4 +215,6 @@ jobs:
                 OTEL_METRICS_EXPORTER=none \
                 OTEL_LOGS_EXPORTER=none \
                 /tmp/beacon-dotnet-auto/instrument.sh ./bin/Release/net8.0/publish/testapp
+              sh /tmp/beacon-dotnet-auto/uninstall.sh
+              test ! -e /tmp/beacon-dotnet-auto
             '

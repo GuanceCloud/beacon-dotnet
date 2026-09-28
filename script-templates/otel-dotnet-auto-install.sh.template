@@ -4,6 +4,80 @@ set -e
 RELEASE_REPOSITORY="beacon-observability/beacon-dotnet"
 RELEASE_WORKFLOW="$RELEASE_REPOSITORY/.github/workflows/beacon-release.yml"
 
+test -z "$OTEL_DOTNET_AUTO_HOME" && OTEL_DOTNET_AUTO_HOME="$HOME/.otel-dotnet-auto"
+
+print_usage() {
+  cat <<'EOF'
+Usage: otel-dotnet-auto-install.sh [--uninstall | --help]
+
+With no option, installs Beacon .NET Automatic Instrumentation.
+  --uninstall  Removes the installation from OTEL_DOTNET_AUTO_HOME.
+  --help       Shows this help text.
+EOF
+}
+
+assert_safe_install_path() {
+  target_dir="$1"
+  case "$target_dir" in
+    ""|"/"|"."|".."|"$HOME")
+      echo "Refusing to modify unsafe installation path '$target_dir'." >&2
+      return 1
+      ;;
+  esac
+
+  if [ -d "$target_dir" ]; then
+    canonical_target_dir=$(CDPATH= cd -P "$target_dir" && pwd)
+    case "$canonical_target_dir" in
+      "/"|"$HOME")
+        echo "Refusing to modify unsafe installation path '$canonical_target_dir'." >&2
+        return 1
+        ;;
+    esac
+  fi
+}
+
+uninstall_opentelemetry() {
+  uninstall_dir="$OTEL_DOTNET_AUTO_HOME"
+  assert_safe_install_path "$uninstall_dir"
+
+  if [ ! -e "$uninstall_dir" ]; then
+    echo "Beacon .NET Automatic Instrumentation is already uninstalled from '$uninstall_dir'."
+    return 0
+  fi
+
+  uninstall_dir=$(CDPATH= cd -P "$uninstall_dir" && pwd)
+
+  if [ ! -f "$uninstall_dir/BEACON-METADATA.json" ]; then
+    echo "Refusing to remove '$uninstall_dir': BEACON-METADATA.json was not found." >&2
+    return 1
+  fi
+
+  rm -rf -- "$uninstall_dir"
+  echo "Beacon .NET Automatic Instrumentation was removed from '$uninstall_dir'."
+  echo "Start a new shell before launching applications that should not be instrumented."
+}
+
+case "${1:-}" in
+  "")
+    ;;
+  --uninstall)
+    if [ "$#" -ne 1 ]; then
+      print_usage >&2
+      exit 1
+    fi
+    uninstall_opentelemetry
+    exit 0
+    ;;
+  --help|-h)
+    print_usage
+    exit 0
+    ;;
+  *)
+    print_usage >&2
+    exit 1
+    ;;
+esac
+
 assert_release_version() {
   if ! printf '%s\n' "$1" | grep -Eq '^beacon-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
     echo "Invalid release version '$1'. Expected beacon-vMAJOR.MINOR.PATCH or beacon-vMAJOR.MINOR.PATCH-PRERELEASE (for example, beacon-v0.2.0-beta.1)." >&2
@@ -105,7 +179,6 @@ else
   exit 1
 fi
 
-test -z "$OTEL_DOTNET_AUTO_HOME" && OTEL_DOTNET_AUTO_HOME="$HOME/.otel-dotnet-auto"
 test -z "$VERSION" && VERSION="beacon-v{{VERSION}}"
 
 assert_release_version "$VERSION"
@@ -156,9 +229,34 @@ if [ "${SKIP_RELEASE_VERIFICATION:-false}" != "true" ]; then
   assert_release_asset "$GITHUB_CLI_PATH" "$VERSION" "$ARCHIVE_PATH"
 fi
 
+assert_safe_install_path "$OTEL_DOTNET_AUTO_HOME"
 rm -rf "$OTEL_DOTNET_AUTO_HOME"
 unzip -q "$ARCHIVE_PATH" -d "$OTEL_DOTNET_AUTO_HOME"
 
 if [ -f "$OTEL_DOTNET_AUTO_HOME/instrument.sh" ]; then
   chmod +x "$OTEL_DOTNET_AUTO_HOME/instrument.sh"
 fi
+
+cat > "$OTEL_DOTNET_AUTO_HOME/uninstall.sh" <<'EOF'
+#!/bin/sh
+set -e
+
+install_dir=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
+
+case "$install_dir" in
+  "/"|"$HOME")
+    echo "Refusing to uninstall from unsafe path '$install_dir'." >&2
+    exit 1
+    ;;
+esac
+
+if [ ! -f "$install_dir/BEACON-METADATA.json" ]; then
+  echo "Refusing to remove '$install_dir': BEACON-METADATA.json was not found." >&2
+  exit 1
+fi
+
+rm -rf -- "$install_dir"
+echo "Beacon .NET Automatic Instrumentation was removed from '$install_dir'."
+echo "Start a new shell before launching applications that should not be instrumented."
+EOF
+chmod +x "$OTEL_DOTNET_AUTO_HOME/uninstall.sh"
