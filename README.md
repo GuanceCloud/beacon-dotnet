@@ -1,6 +1,6 @@
 # Beacon .NET
 
-Beacon .NET 是 GuanceCloud 基于 OpenTelemetry .NET Automatic Instrumentation
+Beacon .NET 是基于 OpenTelemetry .NET Automatic Instrumentation
 维护的 .NET 自动插桩探针。本仓库采用完整源码下游方式维护，不是 GitHub Fork。
 
 当前代码基于官方 `v1.17.0` 建立工程。Beacon `0.1.4` 提供 Linux glibc、

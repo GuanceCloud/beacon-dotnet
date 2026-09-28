@@ -17,7 +17,7 @@
 #Requires -RunAsAdministrator
 
 $ServiceLocatorVariable = "OTEL_DOTNET_AUTO_INSTALL_DIR"
-$ReleaseRepository = "GuanceCloud/beacon-dotnet"
+$ReleaseRepository = "beacon-observability/beacon-dotnet"
 $ReleaseWorkflow = "$ReleaseRepository/.github/workflows/beacon-release.yml"
 
 function Get-Current-InstallDir() {
