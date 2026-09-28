@@ -5,6 +5,12 @@
 
 ## Unreleased
 
+## 0.2.1 - 2026-09-28
+
+- 原生 Linux CLI 启动应用前清除仅用于构建期的 `ARCHITECTURE` 覆盖，避免同名宿主
+  环境变量干扰探针的运行时架构检测。
+- 发布与发布后验收工作流改用专用的 `PACKAGE_ARCHITECTURE` 变量。
+
 ## 0.2.0 - 2026-09-28
 
 - Linux/macOS 安装目录新增 `uninstall.sh`，安装器支持 `--uninstall`；Windows
