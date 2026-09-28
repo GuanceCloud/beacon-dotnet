@@ -1,0 +1,106 @@
+#!/bin/sh
+
+set -eu
+
+install_dir="${BEACON_DOTNET_HOME:-/opt/beacon/dotnet}"
+package_name="beacon-dotnet"
+
+usage() {
+  cat <<'EOF'
+Usage: beacon-dotnet <command> [arguments]
+
+Commands:
+  status                 Show installation status and version.
+  version                Print the installed Beacon .NET version.
+  run <command> [args]   Run an application with automatic instrumentation.
+  uninstall              Remove the native Beacon .NET package.
+  help                   Show this help text.
+EOF
+}
+
+fail() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+require_installation() {
+  [ -f "$install_dir/BEACON-METADATA.json" ] || \
+    fail "Beacon .NET is not installed at '$install_dir'."
+}
+
+installed_version() {
+  require_installation
+  version=$(sed -n 's/^[[:space:]]*"version": "\([^"]*\)".*/\1/p' "$install_dir/BEACON-METADATA.json")
+  [ -n "$version" ] || fail "Could not read the installed version."
+  printf '%s\n' "$version"
+}
+
+package_source() {
+  if command -v dpkg-query >/dev/null 2>&1 && dpkg-query -W -f='${Status}' "$package_name" 2>/dev/null | grep -q 'ok installed'; then
+    printf '%s\n' deb
+  elif command -v rpm >/dev/null 2>&1 && rpm -q "$package_name" >/dev/null 2>&1; then
+    printf '%s\n' rpm
+  else
+    printf '%s\n' unknown
+  fi
+}
+
+elevate_if_needed() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    fail "Run this command as root or install sudo."
+  fi
+}
+
+command_name="${1:-help}"
+case "$command_name" in
+  status)
+    require_installation
+    printf 'Status: installed\n'
+    printf 'Version: %s\n' "$(installed_version)"
+    printf 'Directory: %s\n' "$install_dir"
+    printf 'Package: %s\n' "$(package_source)"
+    ;;
+  version|--version|-v)
+    installed_version
+    ;;
+  run)
+    shift
+    [ "$#" -gt 0 ] || fail "run requires an application command."
+    require_installation
+    OTEL_DOTNET_AUTO_HOME="$install_dir" exec "$install_dir/instrument.sh" "$@"
+    ;;
+  uninstall)
+    case "$(package_source)" in
+      deb)
+        if command -v apt-get >/dev/null 2>&1; then
+          elevate_if_needed apt-get remove -y "$package_name"
+        else
+          elevate_if_needed dpkg --remove "$package_name"
+        fi
+        ;;
+      rpm)
+        if command -v dnf >/dev/null 2>&1; then
+          elevate_if_needed dnf remove -y "$package_name"
+        elif command -v yum >/dev/null 2>&1; then
+          elevate_if_needed yum remove -y "$package_name"
+        else
+          elevate_if_needed rpm -e "$package_name"
+        fi
+        ;;
+      *)
+        fail "Beacon .NET is not managed by a supported DEB or RPM package."
+        ;;
+    esac
+    ;;
+  help|--help|-h)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

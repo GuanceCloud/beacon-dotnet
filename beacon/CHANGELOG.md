@@ -7,6 +7,10 @@
 
 - Linux/macOS 安装目录新增 `uninstall.sh`，安装器支持 `--uninstall`；Windows
   安装时自动生成 `uninstall.ps1`，一键清理当前会话、IIS、已注册 Windows 服务和核心文件。
+- 增加 Windows MSI 与 Linux DEB/RPM 原生安装包，以及统一的
+  `beacon-dotnet status|version|run|uninstall` 命令。
+- Windows Installer 卸载前自动撤销 IIS、Windows Service 和 GAC 注册，避免遗留
+  指向已删除探针文件的系统配置。
 
 ## 0.1.3 - 2026-09-25
 

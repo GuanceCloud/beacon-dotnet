@@ -179,6 +179,53 @@ the CLR Profiler, you may set both `DOTNET_EnableDiagnostics=1` and
 to 0. See this [issue](https://github.com/dotnet/runtime/issues/96227#issuecomment-1865326080)
 for more guidance.
 
+### Native Beacon packages
+
+Beacon releases provide native packages for system-managed installation:
+
+- Windows x64: `beacon-dotnet-<version>-windows-x64.msi`
+- Debian/Ubuntu glibc: `beacon-dotnet-<version>-linux-amd64.deb` and
+  `beacon-dotnet-<version>-linux-arm64.deb`
+- RPM-based glibc distributions: `beacon-dotnet-<version>-linux-x86_64.rpm`
+  and `beacon-dotnet-<version>-linux-aarch64.rpm`
+
+Install a downloaded package with the operating system package manager:
+
+```sh
+sudo apt install ./beacon-dotnet-<version>-linux-amd64.deb
+# or
+sudo dnf install ./beacon-dotnet-<version>-linux-x86_64.rpm
+```
+
+On Windows, run from an administrator PowerShell session:
+
+```powershell
+Start-Process msiexec.exe -Wait -ArgumentList '/i beacon-dotnet-<version>-windows-x64.msi'
+```
+
+Open a new terminal after MSI installation so the updated machine `PATH` is
+available to the `beacon-dotnet` command.
+
+The packages install the `beacon-dotnet` command:
+
+```text
+beacon-dotnet status
+beacon-dotnet version
+beacon-dotnet run <application> [arguments]
+beacon-dotnet uninstall
+```
+
+`run` instruments only the child application. Windows Installer also registers
+the matching PowerShell module, .NET Framework assemblies, machine locator and
+command path. Uninstalling from Windows Apps & Features or with
+`beacon-dotnet uninstall` removes IIS/Windows Service registrations before
+deleting package-owned files.
+
+Native packages are currently distributed as GitHub Release assets rather than
+through an APT/RPM repository. Verify their GitHub artifact attestation before
+installation. Linux musl, macOS, containers and per-user installations should
+continue to use the archive and scripts below.
+
 ### Shell scripts
 
 You can install OpenTelemetry .NET Automatic Instrumentation

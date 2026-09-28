@@ -12,6 +12,42 @@ permissions:
   contents: read
 
 jobs:
+  msi-installer:
+    name: MSI installer on ${{ matrix.machine }}
+    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    strategy:
+      fail-fast: false
+      matrix:
+        machine: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.machine }}
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - name: Setup .NET
+        uses: ./.github/actions/setup-dotnet
+      - name: Download, verify, and validate MSI
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $version = $env:RELEASE_TAG -replace '^beacon-v', ''
+          $asset = "beacon-dotnet-$version-windows-x64.msi"
+          $msi = Join-Path $env:RUNNER_TEMP $asset
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --pattern $asset --dir $env:RUNNER_TEMP
+          gh attestation verify $msi `
+            --repo $env:GITHUB_REPOSITORY `
+            --signer-workflow "$env:GITHUB_REPOSITORY/.github/workflows/beacon-release.yml" `
+            --source-ref "refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE -ne 0) { throw "Artifact attestation verification failed." }
+          ./packaging/windows/test-msi.ps1 -MsiPath $msi
+
   powershell-installer:
     name: PowerShell installer on ${{ matrix.machine }}
     if: startsWith(github.event.release.tag_name, 'beacon-v')
@@ -70,6 +106,107 @@ jobs:
           if ([System.Environment]::GetEnvironmentVariable("OTEL_DOTNET_AUTO_INSTALL_DIR", [System.EnvironmentVariableTarget]::Machine)) {
             throw "Installation locator environment variable still exists after uninstall."
           }
+
+  deb-installer:
+    name: DEB installer on ${{ matrix.machine }}
+    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - machine: ubuntu-22.04
+            architecture: amd64
+          - machine: ubuntu-22.04-arm
+            architecture: arm64
+    runs-on: ${{ matrix.machine }}
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - name: Setup .NET
+        uses: ./.github/actions/setup-dotnet
+      - name: Download, verify, install, run, and uninstall DEB
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#beacon-v}"
+          asset="beacon-dotnet-${version}-linux-${ARCHITECTURE}.deb"
+          gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${asset}" --dir "${RUNNER_TEMP}"
+          gh attestation verify "${RUNNER_TEMP}/${asset}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/beacon-release.yml" \
+            --source-ref "refs/tags/${RELEASE_TAG}"
+          sudo dpkg --install "${RUNNER_TEMP}/${asset}"
+          beacon-dotnet status
+          OTEL_TRACES_EXPORTER=none \
+            OTEL_METRICS_EXPORTER=none \
+            OTEL_LOGS_EXPORTER=none \
+            beacon-dotnet run dotnet --info
+          beacon-dotnet uninstall
+          test ! -e /opt/beacon/dotnet
+
+  rpm-installer:
+    name: RPM installer on ${{ matrix.machine }}
+    if: startsWith(github.event.release.tag_name, 'beacon-v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - machine: ubuntu-24.04
+            architecture: x86_64
+          - machine: ubuntu-24.04-arm
+            architecture: aarch64
+    runs-on: ${{ matrix.machine }}
+    permissions:
+      attestations: read
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - name: Download and verify RPM
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          ARCHITECTURE: ${{ matrix.architecture }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#beacon-v}"
+          asset="beacon-dotnet-${version}-linux-${ARCHITECTURE}.rpm"
+          gh release download "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${asset}" --dir "${RUNNER_TEMP}"
+          gh attestation verify "${RUNNER_TEMP}/${asset}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/beacon-release.yml" \
+            --source-ref "refs/tags/${RELEASE_TAG}"
+          mkdir -p "${RUNNER_TEMP}/beacon-rpm"
+          cp "${RUNNER_TEMP}/${asset}" "${RUNNER_TEMP}/beacon-rpm/beacon-dotnet.rpm"
+      - name: Validate RPM lifecycle in Rocky Linux
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${RUNNER_TEMP}/beacon-rpm:/release:ro" \
+            rockylinux:9 /bin/bash -c '
+              set -euo pipefail
+              rpm --install /release/beacon-dotnet.rpm
+              beacon-dotnet status
+              beacon-dotnet uninstall
+              test ! -e /opt/beacon/dotnet
+            '
 
   unix-installer:
     name: Shell installer on ${{ matrix.machine }}

@@ -19,11 +19,24 @@
 $ServiceLocatorVariable = "OTEL_DOTNET_AUTO_INSTALL_DIR"
 $InstallModuleName = "OpenTelemetry.DotNet.Auto.psm1"
 $UninstallScriptName = "uninstall.ps1"
+$NativePackageRegistryPath = "HKLM:\SOFTWARE\Beacon Observability\Beacon .NET"
 $ReleaseRepository = "beacon-observability/beacon-dotnet"
 $ReleaseWorkflow = "$ReleaseRepository/.github/workflows/beacon-release.yml"
 
 function Get-Current-InstallDir() {
     return [System.Environment]::GetEnvironmentVariable($ServiceLocatorVariable, [System.EnvironmentVariableTarget]::Machine)
+}
+
+function Get-NativePackageProductCode() {
+    $registration = Get-ItemProperty -LiteralPath $NativePackageRegistryPath -ErrorAction SilentlyContinue
+    if (-not $registration -or -not $registration.ProductCode -or -not $registration.InstallDir) {
+        return
+    }
+
+    $installDir = Get-Current-InstallDir
+    if ($installDir -and $registration.InstallDir.TrimEnd("\") -ieq $installDir.TrimEnd("\")) {
+        return $registration.ProductCode
+    }
 }
 
 function Get-Newest-InstallVersion() { 
@@ -435,6 +448,10 @@ function Install-OpenTelemetryCore() {
         [switch]$SkipReleaseVerification
     )
 
+    if (Get-NativePackageProductCode) {
+        throw "Beacon .NET is managed by Windows Installer. Upgrade or repair it with the MSI package."
+    }
+
     $version = "beacon-v{{VERSION}}"
     $installDir = Get-CLIInstallDir-From-InstallDir $InstallDir
     $downloadDir = $null
@@ -492,19 +509,18 @@ function Install-OpenTelemetryCore() {
 
 <#
     .SYNOPSIS
-    Uninstalls OpenTelemetry .NET Automatic Instrumentation.
+    Unregisters OpenTelemetry .NET assemblies from the Global Assembly Cache.
 #>
-function Uninstall-OpenTelemetryCore() {
-    $installDir = Get-Current-InstallDir
-
-    if (-not $installDir) {
-        throw "OpenTelemetry Core is already removed."
+function Unregister-AssembliesFromGAC([string]$InstallDir) {
+    $netFxDirectory = Join-Path $InstallDir "netfx"
+    if (-not (Test-Path -LiteralPath $netFxDirectory -PathType Container)) {
+        return
     }
 
-    # Unregister .NET Framwework dlls from GAC
+    # Unregister .NET Framework dlls from GAC
     [System.Reflection.Assembly]::Load("System.EnterpriseServices, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a") | Out-Null
-    $publish = New-Object System.EnterpriseServices.Internal.Publish 
-    $dlls = Get-ChildItem -Path $installDir\netfx\ -Recurse -Filter *.dll -File
+    $publish = New-Object System.EnterpriseServices.Internal.Publish
+    $dlls = Get-ChildItem -Path $netFxDirectory -Recurse -Filter *.dll -File
     for ($i = 0; $i -lt $dlls.Count; $i++) {
         $percentageComplete = $i / $dlls.Count * 100
         Write-Progress -Activity "Unregistering .NET Framework dlls from GAC" `
@@ -518,6 +534,32 @@ function Uninstall-OpenTelemetryCore() {
         $publish.GacRemove($dlls[$i].FullName)
     }
     Write-Progress -Activity "Unregistering .NET Framework dlls from GAC" -Status "Ready" -Completed
+}
+
+<#
+    .SYNOPSIS
+    Uninstalls OpenTelemetry .NET Automatic Instrumentation core files.
+    .PARAMETER SkipAssembliesInGAC
+    Skips GAC cleanup when it was already performed by an outer installer.
+#>
+function Uninstall-OpenTelemetryCore() {
+    param(
+        [switch]$SkipAssembliesInGAC
+    )
+
+    if (Get-NativePackageProductCode) {
+        throw "Beacon .NET is managed by Windows Installer. Use 'beacon-dotnet uninstall' or Windows Apps & Features."
+    }
+
+    $installDir = Get-Current-InstallDir
+
+    if (-not $installDir) {
+        throw "OpenTelemetry Core is already removed."
+    }
+
+    if (-not $SkipAssembliesInGAC) {
+        Unregister-AssembliesFromGAC -InstallDir $installDir
+    }
 
     Remove-Item -LiteralPath $installDir -Force -Recurse
 
@@ -539,15 +581,15 @@ function Get-Registered-WindowsServiceNames([string]$InstallDir) {
 
 <#
     .SYNOPSIS
-    Completely uninstalls OpenTelemetry .NET Automatic Instrumentation.
+    Removes registrations that refer to the current installation without deleting files.
     .DESCRIPTION
-    Clears the current PowerShell session, automatically finds IIS and Windows
-    services registered with the current installation, removes their
-    instrumentation variables, and then removes the core files.
+    This command is used by native installers before they remove package-owned files.
+    It clears the current session, automatically finds IIS and Windows services
+    registered with the installation, and unregisters .NET Framework assemblies.
     .PARAMETER NoReset
     Does not reset IIS or restart running Windows services after cleanup.
 #>
-function Uninstall-OpenTelemetry() {
+function Unregister-OpenTelemetryInstallation() {
     param(
         [switch]$NoReset
     )
@@ -556,7 +598,7 @@ function Uninstall-OpenTelemetry() {
     Unregister-OpenTelemetryForCurrentSession
 
     if (-not $installDir) {
-        Write-Information -MessageData "Beacon .NET Automatic Instrumentation is already uninstalled." -InformationAction Continue
+        Write-Information -MessageData "Beacon .NET Automatic Instrumentation is already unregistered." -InformationAction Continue
         return
     }
 
@@ -581,7 +623,43 @@ function Uninstall-OpenTelemetry() {
         }
     }
 
-    Uninstall-OpenTelemetryCore
+    Unregister-AssembliesFromGAC -InstallDir $installDir
+}
+
+<#
+    .SYNOPSIS
+    Completely uninstalls OpenTelemetry .NET Automatic Instrumentation.
+    .DESCRIPTION
+    Clears the current PowerShell session, automatically finds IIS and Windows
+    services registered with the current installation, removes their
+    instrumentation variables, and then removes the core files.
+    .PARAMETER NoReset
+    Does not reset IIS or restart running Windows services after cleanup.
+#>
+function Uninstall-OpenTelemetry() {
+    param(
+        [switch]$NoReset
+    )
+
+    $productCode = Get-NativePackageProductCode
+    if ($productCode) {
+        $process = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @("/x", $productCode, "/passive", "/norestart")
+        if ($process.ExitCode -notin @(0, 3010)) {
+            throw "Windows Installer failed with exit code $($process.ExitCode)."
+        }
+        return
+    }
+
+    $installDir = Get-Current-InstallDir
+
+    if (-not $installDir) {
+        Unregister-OpenTelemetryForCurrentSession
+        Write-Information -MessageData "Beacon .NET Automatic Instrumentation is already uninstalled." -InformationAction Continue
+        return
+    }
+
+    Unregister-OpenTelemetryInstallation -NoReset:$NoReset
+    Uninstall-OpenTelemetryCore -SkipAssembliesInGAC
     Write-Information -MessageData "Beacon .NET Automatic Instrumentation was completely uninstalled." -InformationAction Continue
 }
 
@@ -602,6 +680,10 @@ function Update-OpenTelemetryCore() {
         [Parameter(Mandatory = $false)]
         [switch]$SkipReleaseVerification
     )
+
+    if (Get-NativePackageProductCode) {
+        throw "Beacon .NET is managed by Windows Installer. Install a newer MSI package to upgrade it."
+    }
 
     $currentInstallVersion = Get-OpenTelemetryInstallVersion
     if (-not $currentInstallVersion) {
@@ -894,6 +976,7 @@ Export-ModuleMember -Function Register-OpenTelemetryForWindowsService
 Export-ModuleMember -Function Register-OpenTelemetryForCurrentSession
 Export-ModuleMember -Function Uninstall-OpenTelemetryCore
 Export-ModuleMember -Function Uninstall-OpenTelemetry
+Export-ModuleMember -Function Unregister-OpenTelemetryInstallation
 Export-ModuleMember -Function Update-OpenTelemetryCore
 Export-ModuleMember -Function Unregister-OpenTelemetryForIIS
 Export-ModuleMember -Function Unregister-OpenTelemetryForWindowsService
