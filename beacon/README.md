@@ -1,67 +1,82 @@
-# Beacon .NET 开发说明
+# Beacon .NET Development Guide
 
-本仓库维护完整
+This repository maintains the complete source tree of
 [OpenTelemetry .NET Automatic Instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet-instrumentation)
-源码，并在其上准备 Beacon .NET 产品制品。产品总入口为
-[beacon-observability/beacon](https://github.com/beacon-observability/beacon)。
+and produces Beacon .NET artifacts from it. The product entry point is
+[beacon-observability/beacon](https://github.com/beacon-observability/beacon).
 
-## 当前状态
+## Current Status
 
-- 已从官方 `v1.17.0` 固定基线建立非 Fork 下游工程并保留上游历史。
-- Beacon `0.1.4` 发布 Linux glibc/musl x64 与 ARM64、Windows、macOS 和
-  NuGet 归档，并提供 Shell 与 PowerShell 安装脚本。
-- `Unreleased` 增加 Windows MSI、Linux DEB/RPM 与跨平台 `beacon-dotnet`
-  状态、运行和卸载入口；原生包生命周期由系统安装器管理。
-- 构建阶段使用真实控制台和 ASP.NET Core 应用验证 OTLP Trace、Metric、Log；
-  发布后再次从 GitHub Release 下载安装并运行 .NET 8 应用。
-- 发布附带统一 SHA-256 清单、SPDX SBOM 和 GitHub 构建证明。
-- 尚未实现 Beacon 自有运行时增强；DataKit 接收链路尚未纳入已验证支持范围。
+- The downstream project is pinned to upstream `v1.17.0`, retains upstream
+  history, and is maintained as a full-source repository rather than a GitHub
+  fork.
+- Beacon publishes Linux glibc/musl x64 and ARM64, Windows, macOS, and NuGet
+  archives; Windows MSI and Linux DEB/RPM packages; and Shell and PowerShell
+  installers.
+- Native packages expose the cross-platform `beacon-dotnet` status, run, and
+  uninstall commands. Their lifecycle is managed by the operating-system
+  installer.
+- Build jobs use real console and ASP.NET Core applications to verify OTLP
+  traces, metrics, and logs. Post-release jobs download the public GitHub
+  Release and run .NET 8 applications again.
+- Releases include a unified SHA-256 manifest, an SPDX SBOM, and GitHub artifact
+  attestations.
+- Beacon-specific runtime enhancements have not yet been implemented.
+  End-to-end DataKit ingestion is not yet within the verified support scope.
 
-这些状态只描述工程准备情况，不把上游支持范围自动视为 Beacon 已验证范围。
+These statements describe the engineering readiness of Beacon itself. Upstream
+support is not automatically treated as verified Beacon support.
 
-## 工程布局
+## Repository Layout
 
-| 位置                 | 用途                                                |
-| -------------------- | --------------------------------------------------- |
-| [`src`](../src/)     | 托管自动插桩、启动 Hook、Loader 和原生 CLR Profiler |
-| [`nuget`](../nuget/) | 上游兼容 NuGet 包布局；以聚合归档形式发布           |
-| [`build`](../build/) | Nuke 构建与测试入口                                 |
-| [`packaging`](../packaging/) | MSI、DEB/RPM 与安装管理命令                  |
-| [`docs`](../docs/)   | 继承的 OpenTelemetry 使用和实现文档                 |
-| [`beacon`](./)       | Beacon 版本、来源、打包、同步与发行说明             |
+| Location | Purpose |
+| --- | --- |
+| [`src`](../src/) | Managed automatic instrumentation, Startup Hook, Loader, and native CLR Profiler |
+| [`nuget`](../nuget/) | Upstream-compatible NuGet package layout, published as an aggregate archive |
+| [`build`](../build/) | Nuke build and test entry points |
+| [`packaging`](../packaging/) | MSI, DEB/RPM, and installation-management commands |
+| [`docs`](../docs/) | Inherited OpenTelemetry usage and implementation documentation |
+| [`beacon`](./) | Beacon versioning, provenance, packaging, synchronization, and release documentation |
 
-## 产品与制品边界
+## Product and Artifact Boundaries
 
-对外产品名称为 **Beacon .NET**。平台归档采用：
+The public product name is **Beacon .NET**. Platform archives use this naming
+scheme:
 
 ```text
-beacon-dotnet-auto-<Beacon版本>-<平台标识>.zip
+beacon-dotnet-auto-<Beacon-version>-<platform-id>.zip
 checksums.txt
 ```
 
-平台标识示例包括 `linux-glibc-x64`、`linux-musl-arm64`、`macos-arm64` 和
-`windows-x64`。归档内保留 `OpenTelemetry.AutoInstrumentation.*` 程序集、
-原生库、环境变量和 instrumentation scope 名称，避免仅为品牌进行全仓重命名，
-破坏插件、强名称、CLR Profiler 或上游生态兼容性。
+Platform identifiers include `linux-glibc-x64`, `linux-musl-arm64`,
+`macos-arm64`, and `windows-x64`. Archives retain the
+`OpenTelemetry.AutoInstrumentation.*` assembly names, native-library names,
+environment variables, and instrumentation-scope names. A repository-wide
+brand-only rename would break compatibility with plugins, strong names, the CLR
+Profiler, and the upstream ecosystem.
 
-NuGet 聚合归档保留上游包 ID，因为主包依赖 BuildTasks、Loader、StartupHook、
-托管与原生 Runtime 等配套包。完成整套包图的命名、依赖、升级与兼容性验证前，
-不发布虚假的 `Beacon.AutoInstrumentation` 包。
+The aggregate NuGet archive retains upstream package IDs because the primary
+package depends on companion BuildTasks, Loader, StartupHook, managed-runtime,
+and native-runtime packages. Beacon will not publish a misleading
+`Beacon.AutoInstrumentation` package until the complete package graph, naming,
+dependencies, upgrades, and compatibility have been validated.
 
-原生包安装到 Linux `/opt/beacon/dotnet` 或 Windows
-`%ProgramFiles%\Beacon\dotnet`，并提供 `beacon-dotnet` 命令。它们复用同一份
-平台归档内容，不建立第二套探针二进制。
+Native packages install into `/opt/beacon/dotnet` on Linux or
+`%ProgramFiles%\Beacon\dotnet` on Windows and expose the `beacon-dotnet`
+command. They reuse the same platform-archive contents rather than introducing
+a second set of profiler binaries.
 
-## 维护入口
+## Maintenance Entry Points
 
-- [固定来源与当前基线](upstream.lock.json)
-- [上游同步流程](UPSTREAM.md)
-- [产品版本](version.properties)
-- [制品与发行准备](RELEASING.md)
-- [Beacon Changelog](CHANGELOG.md)
+- [Pinned provenance and current baseline](upstream.lock.json)
+- [Upstream synchronization process](UPSTREAM.md)
+- [Product version](version.properties)
+- [Artifacts and release preparation](RELEASING.md)
+- [Beacon changelog](CHANGELOG.md)
 
-日常自动 CI 检查 Beacon 元数据、打包脚本，完成 Linux x64 构建，并针对打包后
-的同一份归档运行 .NET 8 OTLP Trace、Metric、Log 及 ASP.NET Core 客户端/服务端
-自动插桩验证。标签工作流执行完整多平台构建并先创建草稿 Release；发布后工作流
-再验证安装脚本、制品证明、元数据以及 Windows、macOS、Linux glibc/musl 上的
-真实应用启动。
+Regular CI checks Beacon metadata and packaging scripts, builds Linux x64, and
+uses the packaged archive to validate .NET 8 OTLP traces, metrics, logs, and
+ASP.NET Core client/server automatic instrumentation. Tag workflows perform the
+complete multi-platform build and first create a draft Release. Post-release
+workflows then verify installers, artifact attestations, metadata, and real
+application startup on Windows, macOS, and Linux glibc/musl.

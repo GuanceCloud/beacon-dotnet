@@ -1,46 +1,61 @@
 # Beacon .NET Changelog
 
-本文件只记录 Beacon .NET 产品变化；继承的上游变化见根目录
-[`CHANGELOG.md`](../CHANGELOG.md)。
+This file records Beacon .NET product changes only. See the root
+[`CHANGELOG.md`](../CHANGELOG.md) for inherited upstream changes.
 
 ## Unreleased
 
 ## 0.2.1 - 2026-09-28
 
-- 原生 Linux CLI 启动应用前清除仅用于构建期的 `ARCHITECTURE` 覆盖，避免同名宿主
-  环境变量干扰探针的运行时架构检测。
-- 发布与发布后验收工作流改用专用的 `PACKAGE_ARCHITECTURE` 变量。
+- Clear the build-time `ARCHITECTURE` override before the native Linux CLI
+  starts an application, preventing an identically named host environment
+  variable from interfering with runtime architecture detection.
+- Use the dedicated `PACKAGE_ARCHITECTURE` variable in release and post-release
+  validation workflows.
 
 ## 0.2.0 - 2026-09-28
 
-- Linux/macOS 安装目录新增 `uninstall.sh`，安装器支持 `--uninstall`；Windows
-  安装时自动生成 `uninstall.ps1`，一键清理当前会话、IIS、已注册 Windows 服务和核心文件。
-- 增加 Windows MSI 与 Linux DEB/RPM 原生安装包，以及统一的
-  `beacon-dotnet status|version|run|uninstall` 命令。
-- Windows Installer 卸载前自动撤销 IIS、Windows Service 和 GAC 注册，避免遗留
-  指向已删除探针文件的系统配置。
+- Add `uninstall.sh` to Linux/macOS installations and support
+  `--uninstall` in the installer. Windows installations now generate
+  `uninstall.ps1` to clean the current session, IIS, registered Windows
+  Services, and core files in one operation.
+- Add a Windows MSI, Linux DEB/RPM native packages, and the unified
+  `beacon-dotnet status|version|run|uninstall` command.
+- Make Windows Installer remove IIS, Windows Service, and GAC registrations
+  before uninstalling files, preventing system configuration from referencing
+  a removed profiler.
 
 ## 0.1.3 - 2026-09-25
 
-- 修复跨 GitHub Actions artifact 传递后 `instrument.sh` 执行位丢失的问题。
-- Shell 安装器解压后防御性恢复 `instrument.sh` 执行位。
+- Fix the loss of the `instrument.sh` executable bit when artifacts move
+  between GitHub Actions jobs.
+- Make the Shell installer defensively restore the `instrument.sh` executable
+  bit after extraction.
 
 ## 0.1.2 - 2026-09-24
 
-- 安装脚本改为强制验证由 Beacon 发行工作流生成的 artifact attestation，不再
-  依赖需要仓库管理员单独启用的 Immutable Releases。
-- 发布后跨平台安装验证同步使用 artifact attestation 验证下载文件。
+- Require installation scripts to verify artifact attestations produced by the
+  Beacon release workflow instead of depending on Immutable Releases, which
+  must be enabled separately by a repository administrator.
+- Use artifact attestations in post-release cross-platform download validation.
 
 ## 0.1.1 - 2026-09-24
 
-- 增加 Linux glibc/musl x64 与 ARM64、Windows、macOS 和 NuGet 发布归档。
-- 增加 Shell 与 PowerShell 安装脚本，以及发布后的跨平台安装和运行验证。
-- 增加统一 SHA-256 清单、SPDX SBOM 和 GitHub 构建证明。
-- 所有平台归档统一包含 Beacon 版本、目标平台和固定上游来源元数据。
+- Add release archives for Linux glibc/musl x64 and ARM64, Windows, macOS, and
+  NuGet.
+- Add Shell and PowerShell installers plus post-release cross-platform
+  installation and runtime validation.
+- Add a unified SHA-256 manifest, an SPDX SBOM, and GitHub build attestations.
+- Include Beacon version, target platform, and pinned upstream provenance
+  metadata in every platform archive.
 
 ## 0.1.0 - 2026-09-24
 
-- 基于 OpenTelemetry .NET Automatic Instrumentation `v1.17.0` 建立完整源码下游工程。
-- 增加 Beacon 独立产品版本、来源检查和候选归档打包入口。
-- 提供经过真实应用 OTLP Trace、Metric、Log 验证的 Linux glibc x64 自动插桩归档。
-- 增加标签校验、制品校验和 GitHub Release 自动发布流程。
+- Establish a full-source downstream based on OpenTelemetry .NET Automatic
+  Instrumentation `v1.17.0`.
+- Add independent Beacon product versioning, provenance checks, and candidate
+  archive packaging.
+- Provide a Linux glibc x64 automatic-instrumentation archive validated with
+  real-application OTLP traces, metrics, and logs.
+- Add tag validation, artifact validation, and automated GitHub Release
+  workflows.
