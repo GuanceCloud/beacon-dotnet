@@ -5,6 +5,16 @@ This file records Beacon .NET product changes only. See the root
 
 ## Unreleased
 
+## 1.0.0 - 2026-09-28
+
+- Publish the first stable Beacon .NET release.
+- Provide one-command installation and complete uninstallation across supported
+  Windows, Linux, and macOS environments.
+- Include native MSI, DEB, and RPM packages alongside portable archives and
+  standalone Shell and PowerShell installers.
+- Verify downloadable artifacts with SHA-256 checksums, an SPDX SBOM, and
+  GitHub artifact attestations.
+
 ## 0.2.2 - 2026-09-28
 
 - Standardize Beacon product tags and GitHub Releases on the `vX.Y.Z` format.
