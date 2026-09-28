@@ -1,49 +1,58 @@
-# Beacon .NET 发行准备
+# Beacon .NET Release Preparation
 
-Beacon .NET 通过带版本的 GitHub Release 发布。每个 Release 必须由标签工作流从
-固定提交重新构建，先生成草稿供人工核验，发布后再从公开 Release 重新下载安装。
+Beacon .NET is distributed through versioned GitHub Releases. Every Release
+must be rebuilt from a pinned commit by the tag workflow, created first as a
+draft for manual verification, and downloaded again from the public Release for
+post-publication validation.
 
-## 版本与标签
+## Versions and Tags
 
-- [`version.properties`](version.properties) 是 Beacon 产品版本的唯一手工入口。
-- 开发候选版本使用 SemVer，例如 `0.2.0-alpha.1`、`0.2.0-rc.1`；正式版使用
-  `X.Y.Z`。
-- Beacon 标签使用 `beacon-v<版本>`，不复用上游 `v*` 标签。
-- Beacon 产品版本与 [`upstream.lock.json`](upstream.lock.json) 中的上游基线
-  分开维护；不全局替换上游程序集、NuGet 依赖或 instrumentation scope 版本。
+- [`version.properties`](version.properties) is the only manually maintained
+  source for the Beacon product version.
+- Development candidates use SemVer versions such as `0.2.0-alpha.1` and
+  `0.2.0-rc.1`. Stable releases use `X.Y.Z`.
+- Beacon tags use `beacon-v<version>` and do not reuse upstream `v*` tags.
+- The Beacon product version is maintained independently of the upstream
+  baseline in [`upstream.lock.json`](upstream.lock.json). Do not globally
+  replace upstream assembly versions, NuGet dependencies, or instrumentation
+  scope versions.
 
-## 发布制品
+## Release Artifacts
 
-`0.1.1` 起，一个版本包含以下自定义 Release assets：
+Each release since `0.1.1` contains the following custom assets:
 
 ```text
-beacon-dotnet-auto-<版本>-linux-glibc-x64.zip
-beacon-dotnet-auto-<版本>-linux-glibc-arm64.zip
-beacon-dotnet-auto-<版本>-linux-musl-x64.zip
-beacon-dotnet-auto-<版本>-linux-musl-arm64.zip
-beacon-dotnet-auto-<版本>-windows.zip
-beacon-dotnet-auto-<版本>-macos.zip
-beacon-dotnet-auto-<版本>-nuget-packages.zip
-beacon-dotnet-<版本>-linux-amd64.deb
-beacon-dotnet-<版本>-linux-arm64.deb
-beacon-dotnet-<版本>-linux-x86_64.rpm
-beacon-dotnet-<版本>-linux-aarch64.rpm
-beacon-dotnet-<版本>-windows-x64.msi
+beacon-dotnet-auto-<version>-linux-glibc-x64.zip
+beacon-dotnet-auto-<version>-linux-glibc-arm64.zip
+beacon-dotnet-auto-<version>-linux-musl-x64.zip
+beacon-dotnet-auto-<version>-linux-musl-arm64.zip
+beacon-dotnet-auto-<version>-windows.zip
+beacon-dotnet-auto-<version>-macos.zip
+beacon-dotnet-auto-<version>-nuget-packages.zip
+beacon-dotnet-<version>-linux-amd64.deb
+beacon-dotnet-<version>-linux-arm64.deb
+beacon-dotnet-<version>-linux-x86_64.rpm
+beacon-dotnet-<version>-linux-aarch64.rpm
+beacon-dotnet-<version>-windows-x64.msi
 otel-dotnet-auto-install.sh
 OpenTelemetry.DotNet.Auto.psm1
 checksums.txt
 sbom.spdx.json
 ```
 
-GitHub 还会自动提供源码归档和 Release attestation。平台归档保留上游内部文件名，
-并额外包含 `BEACON-METADATA.json`，记录 Beacon 版本、目标平台、源码提交以及
-上游标签和提交。NuGet 聚合归档保留上游兼容包 ID。
+GitHub also provides source archives and Release attestations. Platform archives
+retain upstream internal file names and include `BEACON-METADATA.json`, which
+records the Beacon version, target platform, source commit, upstream tag, and
+upstream commit. The aggregate NuGet archive retains upstream-compatible package
+IDs.
 
-DEB/RPM 与 MSI 也必须包含在统一校验和及 artifact attestation 中。当前尚未接入
-Windows Authenticode 和 APT/RPM 软件源签名，公开安装前必须先验证 GitHub
-attestation；接入正式签名凭据后才能宣称操作系统原生信任。
+DEB/RPM and MSI files must be covered by the unified checksum manifest and
+artifact attestations. Windows Authenticode and APT/RPM repository signing are
+not currently configured. Verify the GitHub artifact attestation before public
+installation. Do not claim operating-system-native trust until official signing
+identities have been provisioned.
 
-本地为已经构建的目录写入元数据并打包时可执行：
+To add metadata to an already-built directory and package it locally, run:
 
 ```bash
 bash beacon/scripts/check-version.sh
@@ -53,19 +62,27 @@ bash beacon/scripts/package.sh \
   --output bin/beacon-artifacts
 ```
 
-这些脚本不代替构建、单元测试、功能测试或各平台验证。
+These scripts do not replace builds, unit tests, functional tests, or
+platform-specific validation.
 
-## 发行与验收流程
+## Release and Acceptance Process
 
-1. 固定最终源码提交、上游基线、依赖和构建环境，确认许可证及第三方声明。
-2. 让主分支 CI 与完整多平台专项 CI 通过。
-3. 推送与 `version.properties` 一致的 `beacon-v<版本>` 标签。
-4. 标签工作流构建全部平台、NuGet、MSI、DEB/RPM 制品，生成安装脚本、校验和、SBOM 和证明，
-   校验归档后创建草稿 Release。
-5. 人工检查草稿中的文件数、名称、校验和、元数据和发布说明，再发布草稿。
-6. 发布后工作流从公开 Release 下载安装，在 Windows、macOS、Linux glibc/musl
-   的 x64 与 ARM64 运行 .NET 8 应用，并验证下载文件的 artifact attestation；
-   MSI、DEB/RPM 还必须完成真实安装、运行和卸载闭环。
+1. Pin the final source commit, upstream baseline, dependencies, and build
+   environment. Confirm licenses and third-party notices.
+2. Require the main-branch CI and the complete multi-platform release checks to
+   pass.
+3. Push a `beacon-v<version>` tag that matches `version.properties`.
+4. The tag workflow builds every platform plus NuGet, MSI, and DEB/RPM assets;
+   generates installers, checksums, an SBOM, and attestations; validates the
+   archives; and creates a draft Release.
+5. Manually inspect the draft file count, names, checksums, metadata, and release
+   notes before publishing it.
+6. The post-release workflow downloads the public Release, runs .NET 8
+   applications on Windows, macOS, and Linux glibc/musl for x64 and ARM64, and
+   verifies artifact attestations. MSI and DEB/RPM packages must also complete a
+   real install-run-uninstall lifecycle.
 
-所有验证成功后才可宣布版本可用。已发布标签和制品不可覆盖；失败后修复代码并
-递增版本。DataKit 接收链路仍需独立端到端验收，不能由 OTLP 导出测试推断。
+Do not announce a release until every validation passes. Published tags and
+assets are immutable; fix failures in code and increment the version. DataKit
+ingestion requires independent end-to-end validation and must not be inferred
+from OTLP export tests.

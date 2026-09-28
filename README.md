@@ -1,62 +1,69 @@
 # Beacon .NET
 
-Beacon .NET 是基于 OpenTelemetry .NET Automatic Instrumentation
-维护的 .NET 自动插桩探针。本仓库采用完整源码下游方式维护，不是 GitHub Fork。
+Beacon .NET is a .NET automatic-instrumentation distribution maintained as a
+full-source downstream of OpenTelemetry .NET Automatic Instrumentation. This
+repository is not a GitHub fork.
 
-当前代码基于官方 `v1.17.0` 建立工程。Beacon `0.1.4` 提供 Linux glibc、
-Linux musl、Windows、macOS 和 NuGet 发布归档，覆盖 x64 与适用的 ARM64
-平台，并附带 Shell/PowerShell 安装脚本、校验和、SPDX SBOM 和构建证明。
-发布后会从 GitHub Release 重新下载安装并运行 .NET 8 应用；DataKit 接收链路
-仍不在当前已验证支持范围内。
+The project ships Linux glibc, Linux musl, Windows, macOS, and NuGet archives
+for x64 and applicable ARM64 platforms, together with Windows MSI and Linux
+DEB/RPM packages. Releases also include Shell and PowerShell installers,
+checksums, an SPDX SBOM, and build attestations. After publication, the release
+assets are downloaded again and used to run .NET 8 applications. End-to-end
+DataKit ingestion is not currently within the verified support scope.
 
-开发、上游同步、制品和发行准备入口见 [Beacon 开发说明](beacon/README.md)。
-继承的 OpenTelemetry 使用与实现文档见
-[OpenTelemetry .NET Automatic Instrumentation](docs/README.md)。
+See the [Beacon development guide](beacon/README.md) for development, upstream
+synchronization, artifacts, and release preparation. Inherited OpenTelemetry
+usage and implementation documentation is available under
+[OpenTelemetry .NET Automatic Instrumentation](docs/README.md).
 
-## 原生安装包
+## Native Packages
 
-下一版本开始同时提供 Windows MSI、Linux DEB/RPM 和统一的 `beacon-dotnet`
-命令。下载与主机架构匹配的 Release asset 后安装：
+Beacon provides a Windows MSI, Linux DEB/RPM packages, and the unified
+`beacon-dotnet` command. Download the Release asset matching the host architecture
+and install it:
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./beacon-dotnet-<版本>-linux-amd64.deb
+sudo apt install ./beacon-dotnet-<version>-linux-amd64.deb
 
 # RHEL / Rocky / Fedora
-sudo dnf install ./beacon-dotnet-<版本>-linux-x86_64.rpm
+sudo dnf install ./beacon-dotnet-<version>-linux-x86_64.rpm
 ```
 
 ```powershell
-# Windows 管理员 PowerShell
-Start-Process msiexec.exe -Wait -ArgumentList '/i beacon-dotnet-<版本>-windows-x64.msi'
+# Run from an elevated Windows PowerShell session
+Start-Process msiexec.exe -Wait -ArgumentList '/i beacon-dotnet-<version>-windows-x64.msi'
 ```
 
-安装后各平台统一使用：
+After installation, use the same commands on every supported platform:
 
 ```text
 beacon-dotnet status
-beacon-dotnet run <应用命令> [参数]
+beacon-dotnet run <application-command> [arguments]
 beacon-dotnet uninstall
 ```
 
-Linux musl、macOS、容器和非管理员安装仍使用 ZIP/Shell 方案。
+Linux musl, macOS, containers, and non-administrator installations continue to
+use the ZIP/Shell installation path.
 
-## ZIP 安装的卸载
+## Uninstalling ZIP Installations
 
-Linux 与 macOS 安装后可直接运行：
+On Linux and macOS, run the uninstaller from the installation directory:
 
 ```sh
 sh "$HOME/.otel-dotnet-auto/uninstall.sh"
 ```
 
-Windows 以管理员身份运行安装目录中的卸载脚本：
+On Windows, run the installation-directory uninstaller as an administrator:
 
 ```powershell
 & "$env:ProgramFiles\OpenTelemetry .NET AutoInstrumentation\uninstall.ps1"
 ```
 
-该命令会清理当前会话，并自动识别和清理使用当前 Beacon 安装目录的 IIS 与
-Windows Service 注册项；详细选项见[使用文档](docs/README.md#powershell-module-windows)。
+The Windows command cleans the current session and automatically detects and
+removes IIS and Windows Service registrations that reference the current Beacon
+installation. See the [usage documentation](docs/README.md#powershell-module-windows)
+for detailed options.
 
 ## Beacon Contributors
 
